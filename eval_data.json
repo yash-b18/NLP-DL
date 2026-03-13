@@ -1,0 +1,262 @@
+{
+  "correctness_questions": [
+    {
+      "id": "C01",
+      "question": "What resources do you need to build a settlement?",
+      "expected_answer": "Brick, Lumber, Wool, and Grain",
+      "source_keywords": ["SETTLEMENTS", "BUILD"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C02",
+      "question": "How many victory points do you need to win the game?",
+      "expected_answer": "10 victory points",
+      "source_keywords": ["ENDING THE GAME", "VICTORY POINTS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C03",
+      "question": "What happens when you roll a 7?",
+      "expected_answer": "No one receives resources. Every player with more than 7 resource cards must discard half (rounded down). Then the player who rolled must move the robber to any other terrain hex and steal one resource card at random from a player with a settlement or city adjacent to that hex.",
+      "source_keywords": ["ROLLING A", "ROBBER"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C04",
+      "question": "Can you build a city without first having a settlement there?",
+      "expected_answer": "No. You can only upgrade an existing settlement to a city; you cannot place a city directly.",
+      "source_keywords": ["CITIES", "BUILD"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C05",
+      "question": "How many knight cards do you need to claim the Largest Army card?",
+      "expected_answer": "3 knight cards played face-up",
+      "source_keywords": ["LARGEST ARMY", "KNIGHT CARDS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C06",
+      "question": "Can you play a development card that you bought this turn?",
+      "expected_answer": "No. You may not play a development card purchased during the same turn. The only exception is a victory point card if it brings your total to 10 and wins you the game.",
+      "source_keywords": ["DEVELOPMENT CARDS", "PLAYING DEVELOPMENT CARDS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C07",
+      "question": "What resources do you need to build a road?",
+      "expected_answer": "Brick and Lumber",
+      "source_keywords": ["ROADS", "BUILD"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C08",
+      "question": "What resources do you need to upgrade a settlement to a city?",
+      "expected_answer": "3 Ore and 2 Grain",
+      "source_keywords": ["CITIES", "BUILD"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C09",
+      "question": "What resources do you need to buy a development card?",
+      "expected_answer": "Ore, Wool, and Grain",
+      "source_keywords": ["BUILD", "DEVELOPMENT CARDS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C10",
+      "question": "How many victory points is a settlement worth?",
+      "expected_answer": "1 victory point",
+      "source_keywords": ["SETTLEMENTS", "VICTORY POINTS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C11",
+      "question": "How many victory points is a city worth?",
+      "expected_answer": "2 victory points",
+      "source_keywords": ["CITIES", "VICTORY POINTS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C12",
+      "question": "How many victory points does the Longest Road special card give?",
+      "expected_answer": "2 victory points",
+      "source_keywords": ["LONGEST ROAD", "VICTORY POINTS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C13",
+      "question": "How many victory points does the Largest Army special card give?",
+      "expected_answer": "2 victory points",
+      "source_keywords": ["LARGEST ARMY", "VICTORY POINTS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C14",
+      "question": "What is the minimum continuous road length needed to claim the Longest Road card?",
+      "expected_answer": "5 road segments",
+      "source_keywords": ["LONGEST ROAD", "BUILD"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C15",
+      "question": "What happens if the bank doesn't have enough of a resource to pay all players who are owed it?",
+      "expected_answer": "No player receives any of that resource that turn (unless the shortage only affects one player, in which case that player gets as many as are left and any extras are lost).",
+      "source_keywords": ["RESOURCE PRODUCTION"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C16",
+      "question": "Can players trade with each other when it is not their turn?",
+      "expected_answer": "No. Players may only trade with the player whose turn it is. Other players may not trade among themselves.",
+      "source_keywords": ["DOMESTIC TRADE", "TRADE"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C17",
+      "question": "What is the standard maritime trade ratio if you have no harbor?",
+      "expected_answer": "4:1 — you may trade 4 identical resource cards to the bank for 1 resource card of your choice.",
+      "source_keywords": ["MARITIME TRADE"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C18",
+      "question": "Where does the robber start at the beginning of the game?",
+      "expected_answer": "In the desert",
+      "source_keywords": ["ROBBER", "DESERT"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C19",
+      "question": "If you have 9 resource cards and a 7 is rolled, how many cards must you discard?",
+      "expected_answer": "4 cards (half of 9 rounded down)",
+      "source_keywords": ["ROLLING A"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "C20",
+      "question": "Can you trade development cards with other players?",
+      "expected_answer": "No. You cannot trade or give away development cards.",
+      "source_keywords": ["DEVELOPMENT CARDS", "TRADE"],
+      "category": "correctness",
+      "sub_category": ""
+    }
+  ],
+  "stress_test_questions": [
+    {
+      "id": "S01",
+      "question": "I roll a 7 and I have 9 resource cards. I also want to play a knight card this turn. What should I do first?",
+      "expected_answer": "You must handle the 7 roll first: discard 4 cards (half of 9, rounded down), then move the robber and steal. You may play the knight card at any time during your turn (including before rolling), but since you've already rolled a 7, the roll's mandatory effects must complete before you continue. After resolving the 7, you may play the knight card during your turn's trade or build phases — but note you can only play one development card per turn total, and the knight card would also move the robber again.",
+      "source_keywords": ["ROLLING A", "PLAYING DEVELOPMENT CARDS", "KNIGHT CARDS"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "S02",
+      "question": "I just built a settlement on a harbor this turn. Can I immediately use that harbor's favorable trade rate?",
+      "expected_answer": "In standard play (separate trade and build phases), no — you build during the build phase after trading is done, so you cannot trade again. However, using the Combined Trade/Build Phase variant (recommended for experienced players), you can trade and build in any order during your turn, so yes — the rules explicitly state you can use a harbor on the same turn you build a settlement there.",
+      "source_keywords": ["COMBINED TRADE", "HARBORS", "MARITIME TRADE"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "S03",
+      "question": "My road is 6 segments long and holds the Longest Road card. An opponent builds a settlement in the middle of it, breaking it into two branches of 4 and 2. Do I lose the Longest Road card?",
+      "expected_answer": "Your road is broken. You now count only your longest continuous branch, which is 4 segments. Since 4 is less than 5, you no longer have a qualifying road at all. If another player already has a longer continuous road, they take the card. If two or more players now tie for the longest road, the card is set aside until one player has a clearly longer road of at least 5 segments.",
+      "source_keywords": ["LONGEST ROAD"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "S04",
+      "question": "What happens if the bank runs out of a resource that multiple players are owed from a dice roll?",
+      "expected_answer": "No player receives any of that resource during that turn. The exception applies only when the shortage affects a single player — in that case they get as many as are left and any extras are lost. When multiple players are affected, no one gets any.",
+      "source_keywords": ["RESOURCE PRODUCTION"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "S05",
+      "question": "Can I trade 2 wool to another player in exchange for 1 wool?",
+      "expected_answer": "No. The rules explicitly prohibit trading like resources. You cannot trade the same type of resource.",
+      "source_keywords": ["DOMESTIC TRADE", "TRADE"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "S06",
+      "question": "I hold the Longest Road card with a 7-segment road. An opponent breaks my road so that my longest branch is now 5 segments, but another player also has a 5-segment road. Who holds the Longest Road card?",
+      "expected_answer": "When two or more players tie for the longest road, the Longest Road card is set aside. The card only comes back into play when one player has a clearly longer road than all others (and at least 5 segments).",
+      "source_keywords": ["LONGEST ROAD"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "S07",
+      "question": "I move the robber to a hex adjacent to an opponent's settlement, but that opponent has no resource cards. What happens?",
+      "expected_answer": "You still move the robber to that hex (blocking future production), but when you attempt to steal, you get nothing. The rules state: 'If that player has no cards, you get nothing!'",
+      "source_keywords": ["KNIGHT CARDS", "ROLLING A"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "S08",
+      "question": "Can I play a knight card before I roll the dice on my turn?",
+      "expected_answer": "Yes. You may play one development card at any time during your turn, including before rolling the dice.",
+      "source_keywords": ["DEVELOPMENT CARDS", "PLAYING DEVELOPMENT CARDS"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "S09",
+      "question": "Can a player make a binding promise to give resources on a future turn as part of a trade?",
+      "expected_answer": "The rules don't specify whether future-turn promises are binding or even permitted. The rules only state what can be traded (resource cards, not development cards or promises), that trading must involve the current player, and that you cannot give away cards. There is no ruling on the enforceability of future-turn agreements.",
+      "source_keywords": ["DOMESTIC TRADE", "TRADE"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "S10",
+      "question": "What happens if all development cards are bought and the deck runs out mid-game?",
+      "expected_answer": "The rules state: 'Development cards never go back into the supply, and you cannot buy development cards if the supply is empty.' Beyond this, the rules don't elaborate — you simply cannot buy more development cards for the rest of the game.",
+      "source_keywords": ["DEVELOPMENT CARDS", "BUILD"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "S11",
+      "question": "Can I look at which development cards other players have already played?",
+      "expected_answer": "Partially addressed: Knight cards remain face up in front of players and are visible to all. Progress cards are removed from the game after use. Victory point cards stay hidden until the game ends. The rules don't explicitly state whether players can inspect a discard pile or track played progress cards, but played knight cards are always visible.",
+      "source_keywords": ["KNIGHT CARDS", "PROGRESS CARDS", "DEVELOPMENT CARDS"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "S12",
+      "question": "Is there a maximum number of resource cards a player can hold in their hand at any time?",
+      "expected_answer": "The rules don't specify an absolute hand size limit. The only card-count rule is the 7-card threshold: if you hold more than 7 resource cards when a 7 is rolled, you must discard half. There is no stated cap on how many cards you can hold otherwise.",
+      "source_keywords": ["ROLLING A", "RESOURCE CARDS"],
+      "category": "stress",
+      "sub_category": "C"
+    }
+  ]
+}
