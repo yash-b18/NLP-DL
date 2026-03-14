@@ -1,15 +1,15 @@
 """
-evaluate.py
------------
+scripts/evaluate.py
+--------------------
 Run both evaluation sets against the RAG pipeline and produce results.
 
-    .venv/bin/python evaluate.py
+    .venv/bin/python scripts/evaluate.py
 
 Outputs:
-  results.csv  — one row per question, ready for manual correctness scoring
+  data/outputs/results.csv  — one row per question, ready for manual correctness scoring
   Prints retrieval precision, coverage, and hallucination-resistance stats.
 
-After running, open results.csv and fill in the 'correctness_score' column:
+After running, open data/outputs/results.csv and fill in the 'correctness_score' column:
   1   = fully correct
   0.5 = partially correct / incomplete
   0   = wrong or misleading
@@ -20,10 +20,10 @@ import json
 import os
 import sys
 
-from rag_pipeline import query_rag, DEFAULT_K
+from model import query_rag, DEFAULT_K
 
-EVAL_DATA_PATH = "eval_data.json"
-RESULTS_PATH = "results.csv"
+EVAL_DATA_PATH = "data/raw/eval_data.json"
+RESULTS_PATH = "data/outputs/results.csv"
 K = DEFAULT_K  # retrieval depth used throughout
 
 # Phrases that signal the model appropriately admitted the rules are silent
@@ -216,9 +216,9 @@ def print_summary(results: list[dict], k: int = K):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if not os.path.exists("chunks.json") or not os.path.exists("faiss.index"):
-        print("ERROR: chunks.json / faiss.index not found.")
-        print("Run first: .venv/bin/python chunk_and_index.py")
+    if not os.path.exists("data/processed/chunks.json") or not os.path.exists("models/faiss.index"):
+        print("ERROR: data/processed/chunks.json / models/faiss.index not found.")
+        print("Run first: .venv/bin/python scripts/build_features.py")
         sys.exit(1)
 
     run_evaluation()

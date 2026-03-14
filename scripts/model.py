@@ -1,13 +1,14 @@
 """
-rag_pipeline.py
----------------
+scripts/model.py
+----------------
 Retrieval-Augmented Generation pipeline for Catan rules questions.
 
-Usage:
-    .venv/bin/python rag_pipeline.py 'What resources do you need to build a settlement?'
-    .venv/bin/python rag_pipeline.py  # uses a default demo question
+Usage (from project root):
+    .venv/bin/python scripts/model.py 'What resources do you need to build a settlement?'
+    .venv/bin/python scripts/model.py  # uses a default demo question
 
-Requires chunk_and_index.py to have been run first (produces chunks.json + faiss.index).
+Requires scripts/build_features.py to have been run first
+(produces data/processed/chunks.json + models/faiss.index).
 Requires OPENAI_API_KEY to be set in the environment.
 """
 
@@ -22,8 +23,8 @@ try:
 except ImportError:
     pass
 
-CHUNKS_PATH = "chunks.json"
-INDEX_PATH = "faiss.index"
+CHUNKS_PATH = "data/processed/chunks.json"
+INDEX_PATH = "models/faiss.index"
 DEFAULT_K = 3
 OPENAI_MODEL = "gpt-4o-mini"
 
@@ -66,7 +67,7 @@ def _load():
         sys.exit(1)
 
     if not os.path.exists(CHUNKS_PATH) or not os.path.exists(INDEX_PATH):
-        print(f"Index files not found. Run chunk_and_index.py first.", file=sys.stderr)
+        print(f"Index files not found. Run scripts/build_features.py first.", file=sys.stderr)
         sys.exit(1)
 
     if not os.environ.get("OPENAI_API_KEY"):

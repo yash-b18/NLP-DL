@@ -1,11 +1,11 @@
 """
-chunk_and_index.py
-------------------
+scripts/build_features.py
+--------------------------
 Step 1: Parse the Catan rulebook into semantic chunks, embed them with
 sentence-transformers, and store the FAISS index + chunk metadata.
 
-Run once before using the RAG pipeline:
-    .venv/bin/python chunk_and_index.py
+Run once before using the RAG pipeline (from project root):
+    .venv/bin/python scripts/build_features.py
 """
 
 import re
@@ -13,9 +13,9 @@ import json
 import sys
 from pathlib import Path
 
-RULEBOOK_PATH = "catan_rulebook.txt"
-CHUNKS_PATH = "chunks.json"
-INDEX_PATH = "faiss.index"
+RULEBOOK_PATH = "data/raw/catan_rulebook.txt"
+CHUNKS_PATH = "data/processed/chunks.json"
+INDEX_PATH = "models/faiss.index"
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ def main():
     faiss.write_index(index, INDEX_PATH)
     print(f"Saved index   → '{INDEX_PATH}'")
 
-    print("\nDone. You can now run: .venv/bin/python rag_pipeline.py 'your question here'")
+    print("\nDone. You can now run: .venv/bin/python scripts/model.py 'your question here'")
 
 
 if __name__ == "__main__":
