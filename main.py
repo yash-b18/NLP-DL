@@ -1,13 +1,16 @@
 """
-app.py — Streamlit UI for the Catan RAG system.
+main.py — Streamlit UI for the Catan RAG system.
 
-Run:
-    .venv/bin/streamlit run app.py
+Run (from project root):
+    .venv/bin/streamlit run main.py
 """
 
 import csv
 import json
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -24,14 +27,14 @@ st.set_page_config(
 # ── Load model / index once ───────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading model and index…")
 def load_pipeline():
-    from rag_pipeline import retrieve, generate, _load
+    from model import retrieve, generate, _load
     _load()
     return retrieve, generate
 
 
 @st.cache_data(show_spinner=False)
 def load_eval_results():
-    path = "results.csv"
+    path = "data/outputs/results.csv"
     if not os.path.exists(path):
         return None
     rows = []
@@ -43,7 +46,7 @@ def load_eval_results():
 
 @st.cache_data(show_spinner=False)
 def load_chunks():
-    with open("chunks.json") as f:
+    with open("data/processed/chunks.json") as f:
         return json.load(f)
 
 
@@ -104,7 +107,7 @@ with st.sidebar:
                     else f"{color} **{r['id']}** — {r['question']}"
                 )
     else:
-        st.info("Run `evaluate.py` to see results here.")
+        st.info("Run `scripts/evaluate.py` to see results here.")
 
 # ── Main area ─────────────────────────────────────────────────────────────────
 st.title("🎲 Catan Rules Assistant")

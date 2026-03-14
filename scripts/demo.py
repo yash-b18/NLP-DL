@@ -1,8 +1,8 @@
 """
-demo.py — Interactive class demonstration for the Catan RAG system.
+scripts/demo.py — Interactive class demonstration for the Catan RAG system.
 
-Run:
-    .venv/bin/python demo.py
+Run (from project root):
+    .venv/bin/python scripts/demo.py
 
 Shows 4 pre-selected questions that highlight both strengths and failures,
 then drops into an interactive Q&A loop.
@@ -10,7 +10,7 @@ then drops into an interactive Q&A loop.
 Press Ctrl-C to exit.
 """
 
-from rag_pipeline import query_rag
+from model import query_rag
 
 DIVIDER = "=" * 70
 
