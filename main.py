@@ -56,15 +56,19 @@ def load_pipeline(game: str):
 
 
 @st.cache_data(show_spinner=False)
-def load_eval_results(game: str):
-    path = f"data/outputs/{game}_results.csv"
+def load_eval_results(game: str, retriever: str):
+    path = (
+        f"data/outputs/{game}_results.csv"
+        if retriever == "dense"
+        else f"data/outputs/{game}_{retriever}_results.csv"
+    )
     if not os.path.exists(path):
-        return None
+        return None, path
     rows = []
     with open(path) as f:
         for row in csv.DictReader(f):
             rows.append(row)
-    return rows
+    return rows, path
 
 
 @st.cache_data(show_spinner=False)
@@ -120,32 +124,42 @@ with st.sidebar:
     st.divider()
     st.subheader("Evaluation Results")
 
-    results = load_eval_results(selected_game)
+    results, results_path = load_eval_results(selected_game, selected_retriever)
     if results:
         correctness = [r for r in results if r["category"] == "correctness"]
         stress      = [r for r in results if r["category"] == "stress"]
+        stress_c    = [r for r in results if r.get("sub_category") == "C"]
 
         def avg_score(group):
             scores = [float(r["correctness_score"]) for r in group if r["correctness_score"] != ""]
             return sum(scores) / len(scores) if scores else 0
 
+        def avg_prec(group):
+            return sum(float(r["precision_at_k"]) for r in group) / len(group) if group else 0
+
+        halluc_rate = (
+            sum(1 for r in stress_c if r.get("hallucination_check") == "POTENTIAL_HALLUCINATION")
+            / len(stress_c) * 100 if stress_c else 0
+        )
+
         col1, col2 = st.columns(2)
-        col1.metric("Retrieval P@3", "100%")
-        col2.metric("Hallucination", "0%")
+        col1.metric("Retrieval P@3", f"{avg_prec(results):.0%}")
+        col2.metric("Hallucination", f"{halluc_rate:.0f}%")
 
         col3, col4 = st.columns(2)
-        col3.metric("Correctness Qs", f"{avg_score(correctness):.0%}")
-        col4.metric("Stress Test",    f"{avg_score(stress):.0%}")
+        col3.metric("Correctness Qs", f"{avg_score(correctness):.0%}" if any(r["correctness_score"] for r in correctness) else "—")
+        col4.metric("Stress Test",    f"{avg_score(stress):.0%}"      if any(r["correctness_score"] for r in stress)      else "—")
 
         st.divider()
         if st.toggle("Show all results"):
             for r in results:
                 score = r.get("correctness_score", "")
-                color = "🟢" if score == "1" else "🟡" if score == "0.5" else "🔴"
+                color = "🟢" if score == "1" else "🟡" if score == "0.5" else "🔴" if score == "0" else "⚪"
                 label = r["question"][:55] + "…" if len(r["question"]) > 55 else r["question"]
                 st.markdown(f"{color} **{r['id']}** — {label}")
     else:
-        st.info(f"Run `scripts/evaluate.py {selected_game}` to see results here.")
+        retriever_flag = "" if selected_retriever == "dense" else f" --retriever {selected_retriever}"
+        st.info(f"Run `scripts/evaluate.py {selected_game}{retriever_flag}` to see results here.")
 
 # ── Main area ─────────────────────────────────────────────────────────────────
 st.title(f"🎲 {selected_game.title()} Rules Assistant")

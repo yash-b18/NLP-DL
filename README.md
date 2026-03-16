@@ -2,31 +2,53 @@
 
 A Retrieval-Augmented Generation (RAG) system that answers natural language questions about board game rules using official rulebooks as the knowledge base. Currently supports **Catan** and **Monopoly**, with a game-agnostic architecture designed to support additional games.
 
-The system is rigorously evaluated using two complementary test sets per game — correctness questions and adversarial stress tests — to reveal specific failure modes and guide improvements.
+Three retrieval strategies are implemented and compared — a naive baseline, a classical ML approach, and a deep learning approach — with rigorous evaluation per game to reveal failure modes and guide improvements.
 
 ---
 
 ## What It Does
 
 1. **Chunks** each game's rulebook into semantically meaningful sections using game-specific structure-aware parsing
-2. **Embeds** each chunk using a sentence transformer model and indexes them in a FAISS vector store per game
-3. **Retrieves** the top-3 most relevant chunks for any user question using cosine similarity
+2. **Indexes** chunks using three retrieval strategies (dense embeddings, TF-IDF, random)
+3. **Retrieves** the top-k most relevant chunks for any user question
 4. **Generates** a grounded answer using GPT-4o-mini, instructed to cite sources and say "the rules don't specify" when context is insufficient
-5. **Evaluates** the system on 32 curated questions per game across two test sets, computing retrieval precision, coverage, and hallucination rate
+5. **Evaluates** the system on 32 curated questions per game across two test sets
+6. **Experiments** with k-sensitivity analysis comparing all three retrievers
 
 ---
 
 ## Tech Stack
 
-| Component      | Technology                                       |
-| -------------- | ------------------------------------------------ |
-| Embeddings     | `sentence-transformers` — `all-MiniLM-L6-v2`     |
-| Vector store   | `faiss-cpu` — per-game cosine similarity index   |
-| LLM            | OpenAI `gpt-4o-mini` via the `openai` Python SDK |
-| UI             | `streamlit`                                      |
-| Env management | `python-dotenv`                                  |
-| Language       | Python 3.10+                                     |
-| Runtime        | Isolated `.venv` virtual environment             |
+| Component         | Technology                                        |
+| ----------------- | ------------------------------------------------- |
+| Embeddings (DL)   | `sentence-transformers` — `all-MiniLM-L6-v2`      |
+| Classical ML      | `scikit-learn` — TF-IDF + cosine similarity       |
+| Vector store      | `faiss-cpu` — per-game cosine similarity index    |
+| LLM               | OpenAI `gpt-4o-mini` via the `openai` Python SDK  |
+| UI                | `streamlit`                                       |
+| Env management    | `python-dotenv`                                   |
+| Language          | Python 3.10+                                      |
+| Runtime           | Isolated `.venv` virtual environment              |
+
+---
+
+## Modeling Approaches
+
+Three retrieval strategies are implemented, all sharing the same GPT-4o-mini generation step:
+
+| Approach | Strategy | Description |
+|---|---|---|
+| **Naive baseline** | `random` | Randomly selects k chunks — no query signal |
+| **Classical ML** | `tfidf` | TF-IDF bag-of-words + cosine similarity |
+| **Deep learning** | `dense` | sentence-transformer dense embeddings + FAISS |
+
+**k=3 comparison (Catan):**
+
+| Retriever | Precision@3 | Coverage |
+|---|---|---|
+| Random (baseline) | 21.9% | 13.0% |
+| TF-IDF (classical ML) | 96.9% | 81.8% |
+| Dense (deep learning) | 100.0% | 87.5% |
 
 ---
 
@@ -39,10 +61,11 @@ The system is rigorously evaluated using two complementary test sets per game �
 ├── .env                             # API key (OPENAI_API_KEY — not committed)
 │
 ├── scripts/
-│   ├── build_features.py            # Parse rulebook → chunks → FAISS index (per game)
-│   ├── model.py                     # Retrieve top-k + generate with OpenAI (per game)
-│   ├── evaluate.py                  # Run evaluation → {game}_results.csv + summary stats
-│   └── demo.py                      # Interactive CLI demo (curated questions + free input)
+│   ├── build_features.py            # Parse rulebook → chunks → FAISS + TF-IDF indexes
+│   ├── model.py                     # RAG pipeline: retrieve (dense/tfidf/random) + generate
+│   ├── evaluate.py                  # Run evaluation → {game}[_{retriever}]_results.csv
+│   ├── experiment.py                # k-sensitivity analysis across all three retrievers
+│   └── demo.py                      # Interactive CLI demo
 │
 ├── data/
 │   ├── raw/
@@ -51,16 +74,21 @@ The system is rigorously evaluated using two complementary test sets per game �
 │   │   ├── monopoly_rulebook.txt    # Official Monopoly rulebook
 │   │   └── monopoly_eval.json       # 20 correctness Qs + 12 stress-test Qs (Monopoly)
 │   └── outputs/
-│       ├── catan_results.csv        # Catan evaluation results with scores
-│       └── monopoly_results.csv     # Monopoly evaluation results with scores
+│       ├── catan_results.csv                      # Catan dense eval results (scored)
+│       ├── monopoly_results.csv                   # Monopoly dense eval results (scored)
+│       └── catan_experiment_k_sensitivity.csv     # k-sensitivity experiment results
 │
 ├── models/
 │   ├── catan/
 │   │   ├── chunks.json              # Generated: 42 parsed Catan chunks
-│   │   └── faiss.index              # Generated: Catan FAISS vector index
+│   │   ├── faiss.index              # Generated: Catan FAISS vector index
+│   │   ├── tfidf_matrix.npz         # Generated: Catan TF-IDF sparse matrix
+│   │   └── tfidf_vectorizer.pkl     # Generated: Catan TF-IDF vectorizer
 │   └── monopoly/
 │       ├── chunks.json              # Generated: 21 parsed Monopoly chunks
-│       └── faiss.index              # Generated: Monopoly FAISS vector index
+│       ├── faiss.index              # Generated: Monopoly FAISS vector index
+│       ├── tfidf_matrix.npz         # Generated: Monopoly TF-IDF sparse matrix
+│       └── tfidf_vectorizer.pkl     # Generated: Monopoly TF-IDF vectorizer
 │
 └── notebooks/
     └── analysis.md                  # Error analysis: failure modes + proposed fixes
@@ -86,38 +114,56 @@ Create a `.env` file in the project root:
 OPENAI_API_KEY=sk-your-key-here
 ```
 
-### 3. Build the index for each game (one time per game)
+### 3. Build the indexes for each game (one time per game)
 
 ```bash
 .venv/bin/python scripts/build_features.py catan
 .venv/bin/python scripts/build_features.py monopoly
 ```
 
-Parses each rulebook into chunks, embeds them, and saves to `models/{game}/`.
+Builds both the FAISS (dense) and TF-IDF (classical ML) indexes. Saved to `models/{game}/`.
 
 ### 4. Ask a single question
 
 ```bash
 .venv/bin/python scripts/model.py catan "What resources do you need to build a settlement?"
-.venv/bin/python scripts/model.py monopoly "How much money does each player start with?"
+.venv/bin/python scripts/model.py monopoly "How much money does each player start with?" --retriever tfidf
+.venv/bin/python scripts/model.py catan "What happens when you roll a 7?" --retriever random
 ```
 
 ### 5. Run the full evaluation
 
 ```bash
+# Dense (deep learning) — default
 .venv/bin/python scripts/evaluate.py catan
 .venv/bin/python scripts/evaluate.py monopoly
+
+# TF-IDF (classical ML)
+.venv/bin/python scripts/evaluate.py catan --retriever tfidf
+
+# Random (naive baseline)
+.venv/bin/python scripts/evaluate.py catan --retriever random
 ```
 
-Runs all 32 questions per game, prints metrics, writes `data/outputs/{game}_results.csv`.
+### 6. Run the k-sensitivity experiment (no API calls)
 
-### 6. Launch the UI
+```bash
+.venv/bin/python scripts/experiment.py catan
+.venv/bin/python scripts/experiment.py monopoly
+.venv/bin/python scripts/experiment.py all
+```
+
+Compares Precision@k and Coverage across k=1–10 for all three retrievers. No OpenAI calls needed.
+
+### 7. Launch the UI
 
 ```bash
 .venv/bin/streamlit run main.py
 ```
 
-### 7. Run the interactive demo
+The UI includes a game selector and a retriever selector. Evaluation metrics in the sidebar update based on the selected game and retriever.
+
+### 8. Run the interactive demo
 
 ```bash
 .venv/bin/python scripts/demo.py catan
@@ -152,7 +198,7 @@ Adversarial questions in three sub-categories:
 
 ## Results
 
-### Catan
+### Catan (Dense retriever)
 
 | Category                 | N      | Retrieval P@3 | Avg Correctness |
 | ------------------------ | ------ | ------------- | --------------- |
@@ -162,7 +208,7 @@ Adversarial questions in three sub-categories:
 | Stress C — unanswerable  | 4      | 100%          | 88%             |
 | **Overall**              | **32** | **100%**      | **83%**         |
 
-### Monopoly
+### Monopoly (Dense retriever)
 
 | Category                 | N      | Retrieval P@3 | Avg Correctness |
 | ------------------------ | ------ | ------------- | --------------- |
@@ -187,12 +233,15 @@ Each game uses a structure-aware chunker tailored to its rulebook format:
 **Monopoly (21 chunks)**
 - 21 named sections matched by known header patterns (`PREPARATION:`, `"JAIL":`, `MORTGAGES:`, etc.)
 
-Adding a new game requires: a rulebook `.txt` file, a chunker function, and an eval `.json` file — nothing else in the pipeline changes.
+Adding a new game requires: a rulebook `.txt` file, a chunker function registered in `GAMES`, and an eval `.json` file — nothing else in the pipeline changes.
 
 ---
 
 ## Key Findings
 
-Retrieval Precision@3 was 100% across both games. Failures are concentrated in **generation**, not retrieval — the model occasionally abstains on questions where the answer is present in the retrieved context. This distinction was only possible because the evaluation measured retrieval and generation independently.
+- **Dense retrieval dominates** at k=3: 100% Precision@3 vs 96.9% for TF-IDF and 21.9% for random
+- **TF-IDF is competitive** — at k=7 it matches dense at 100%, showing classical ML is viable with slightly more retrieved chunks
+- **Failures are generation problems, not retrieval problems** — the model occasionally abstains even when the answer is in the retrieved context
+- **Hallucination resistance is strong** across both games and all retrievers — the grounding prompt prevents invention of rules
 
 Full error analysis in [`notebooks/analysis.md`](notebooks/analysis.md).
