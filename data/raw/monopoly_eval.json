@@ -1,0 +1,262 @@
+{
+  "correctness_questions": [
+    {
+      "id": "M01",
+      "question": "How much money does each player start with in Monopoly?",
+      "expected_answer": "$1,500 divided as follows: 2 each of $500s, $100s and $50s; 6 $20s; 5 each of $10s, $5s and $1s.",
+      "source_keywords": ["PREPARATION"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M02",
+      "question": "How much do you collect when you pass GO?",
+      "expected_answer": "$200 salary paid by the Banker each time a player's token lands on or passes over GO.",
+      "source_keywords": ["GO"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M03",
+      "question": "What happens if you land on an unowned property and choose not to buy it?",
+      "expected_answer": "The Banker sells it at auction to the highest bidder. Any player, including the one who declined, may bid. Bidding may start at any price.",
+      "source_keywords": ["BUYING PROPERTY"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M04",
+      "question": "How do you get out of jail in Monopoly?",
+      "expected_answer": "Four ways: (1) throw doubles on any of your next three turns, (2) use a Get Out of Jail Free card, (3) purchase a Get Out of Jail Free card from another player and play it, (4) pay a $50 fine before rolling on either of your next two turns.",
+      "source_keywords": ["JAIL"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M05",
+      "question": "What do you receive when you land on Free Parking?",
+      "expected_answer": "Nothing. A player landing on Free Parking does not receive any money, property, or reward of any kind. It is just a free resting place.",
+      "source_keywords": ["FREE PARKING"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M06",
+      "question": "How many houses must be on each property in a color-group before you can build a hotel?",
+      "expected_answer": "Four houses on each property of the complete color-group.",
+      "source_keywords": ["HOTELS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M07",
+      "question": "Can you collect rent while you are in jail?",
+      "expected_answer": "Yes. Even though you are in jail, you may buy and sell property, buy and sell houses and hotels, and collect rents.",
+      "source_keywords": ["JAIL"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M08",
+      "question": "What are the two options for paying Income Tax?",
+      "expected_answer": "Pay a flat $200 to the Bank, or pay 10% of your total worth (all cash on hand, printed prices of mortgaged and unmortgaged properties, and cost price of all buildings). You must decide which option before adding up your total worth.",
+      "source_keywords": ["INCOME TAX"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M09",
+      "question": "How many consecutive doubles do you need to roll to be sent to jail?",
+      "expected_answer": "Three times in succession.",
+      "source_keywords": ["JAIL", "THE PLAY"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M10",
+      "question": "Can you mortgage a property that has houses on it?",
+      "expected_answer": "No. Before an improved property can be mortgaged, all buildings on all properties of its color-group must be sold back to the Bank at half price.",
+      "source_keywords": ["MORTGAGES"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M11",
+      "question": "How much do you get when you sell a house back to the Bank?",
+      "expected_answer": "Half the price paid for it.",
+      "source_keywords": ["SELLING PROPERTY"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M12",
+      "question": "Can players lend money to each other in Monopoly?",
+      "expected_answer": "No. Money can be loaned to a player only by the Bank, and then only by mortgaging property. No player may borrow from or lend money to another player.",
+      "source_keywords": ["MISCELLANEOUS"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M13",
+      "question": "What interest rate must you pay to lift a mortgage?",
+      "expected_answer": "10% of the mortgage value, in addition to the mortgage amount itself.",
+      "source_keywords": ["MORTGAGES"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M14",
+      "question": "What must you do before selling a property in a color-group that has buildings on it?",
+      "expected_answer": "All buildings on all properties of that color-group must be sold back to the Bank before any property in the group can be sold.",
+      "source_keywords": ["SELLING PROPERTY"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M15",
+      "question": "When can you charge double rent for unimproved properties?",
+      "expected_answer": "When you own all the Title Deed cards in a color-group (a complete color-group), you may charge double rent for unimproved properties in that group.",
+      "source_keywords": ["PAYING RENT"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M16",
+      "question": "What happens to a bankrupt player?",
+      "expected_answer": "A bankrupt player must immediately retire from the game. If in debt to another player, they must turn over all assets to that player. The last player left in the game wins.",
+      "source_keywords": ["BANKRUPTCY"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M17",
+      "question": "What is the even-building rule for houses?",
+      "expected_answer": "You cannot erect more than one house on any one property until you have built one house on every property of that color-group. You then begin on the second row, and so on, up to a limit of four houses per property.",
+      "source_keywords": ["HOUSES"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M18",
+      "question": "What happens when the Bank runs out of houses?",
+      "expected_answer": "Players wishing to build must wait until another player returns or sells houses to the Bank. If multiple players want more than the Bank has, the houses must be sold at auction to the highest bidder.",
+      "source_keywords": ["BUILDING SHORTAGES"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M19",
+      "question": "Can the Bank ever go bankrupt?",
+      "expected_answer": "No. The Bank never goes broke. If it runs out of money, the Banker may issue as much more as needed by writing on any ordinary paper.",
+      "source_keywords": ["THE BANK"],
+      "category": "correctness",
+      "sub_category": ""
+    },
+    {
+      "id": "M20",
+      "question": "If you pass GO on a dice throw and then draw an Advance to GO card, do you collect $200 twice?",
+      "expected_answer": "Yes. The rules explicitly state you collect $200 for passing GO the first time and another $200 for reaching it the second time by instructions on the card.",
+      "source_keywords": ["GO"],
+      "category": "correctness",
+      "sub_category": ""
+    }
+  ],
+  "stress_test_questions": [
+    {
+      "id": "MS01",
+      "question": "I am in jail on my turn. Can I pay the $50 fine, roll, and then buy a property I land on?",
+      "expected_answer": "Yes. You pay the $50 fine before rolling, then roll and move normally. If you land on an unowned property, you may buy it at the printed price or it goes to auction. Being in jail does not restrict property purchases.",
+      "source_keywords": ["JAIL", "BUYING PROPERTY"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "MS02",
+      "question": "Another player lands on my property but I forget to ask for rent before the second player after them throws the dice. Do I still get paid?",
+      "expected_answer": "No. The owner may not collect the rent if they fail to ask for it before the second player following throws the dice.",
+      "source_keywords": ["PAYING RENT"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "MS03",
+      "question": "I roll doubles, move and resolve the space, then roll doubles again and resolve, then roll doubles a third time. Where do I go and do I move?",
+      "expected_answer": "On the third doubles roll you move your token immediately to the space marked In Jail. You do not move the number shown on the dice — you go directly to Jail and your turn ends.",
+      "source_keywords": ["JAIL", "THE PLAY"],
+      "category": "stress",
+      "sub_category": "A"
+    },
+    {
+      "id": "MS04",
+      "question": "Another player has a Get Out of Jail Free card and wants to sell it to me. Is there a fixed price?",
+      "expected_answer": "No fixed price. The rules state it may be sold to another player at any price agreeable to both players.",
+      "source_keywords": ["JAIL", "CHANCE AND COMMUNITY CHEST"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "MS05",
+      "question": "I buy a mortgaged property from another player. Do I have to lift the mortgage immediately?",
+      "expected_answer": "No. You may lift it immediately by paying the mortgage value plus 10% interest, or hold it. However, if you hold it and lift the mortgage later, you must pay 10% interest again in addition to the mortgage amount.",
+      "source_keywords": ["MORTGAGES"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "MS06",
+      "question": "Can I buy a hotel directly without first building four houses on the property?",
+      "expected_answer": "No. You must have four houses on each property of a complete color-group before you can buy a hotel. You return the four houses to the Bank and pay the hotel price shown on the Title Deed card.",
+      "source_keywords": ["HOTELS", "HOUSES"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "MS07",
+      "question": "I own a complete color-group but one of the properties in it is mortgaged. Can I still charge double rent on the unmortgaged properties?",
+      "expected_answer": "Yes. The rules state that the double-rent rule applies to unmortgaged properties even if another property in that color-group is mortgaged. No rent can be collected on the mortgaged property itself.",
+      "source_keywords": ["PAYING RENT", "MORTGAGES"],
+      "category": "stress",
+      "sub_category": "B"
+    },
+    {
+      "id": "MS08",
+      "question": "What is the exact rent amount for landing on a railroad?",
+      "expected_answer": "The rules don't specify exact rent amounts for railroads in this text — those amounts are printed on the individual Title Deed cards, which are not reproduced in the rulebook.",
+      "source_keywords": ["PAYING RENT"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "MS09",
+      "question": "What happens if two players tie on the initial dice roll to determine who goes first?",
+      "expected_answer": "The rules don't specify what happens in the event of a tie — they only state that the player with the highest total starts the play.",
+      "source_keywords": ["THE PLAY"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "MS10",
+      "question": "Is there a time limit on how long a player's turn can last?",
+      "expected_answer": "The rules don't specify any time limit per turn.",
+      "source_keywords": ["THE PLAY"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "MS11",
+      "question": "Can I give money to another player as a gift, not as part of any property transaction?",
+      "expected_answer": "The rules don't explicitly address gifting money. They state no player may borrow from or lend money to another player, but it is unclear whether an outright gift (not a loan) is also prohibited.",
+      "source_keywords": ["MISCELLANEOUS"],
+      "category": "stress",
+      "sub_category": "C"
+    },
+    {
+      "id": "MS12",
+      "question": "What happens if a player refuses to pay rent they owe?",
+      "expected_answer": "The rules don't specify any enforcement mechanism for rent disputes. They only state that the owner forfeits the right to collect rent if they fail to ask before the second player following throws the dice.",
+      "source_keywords": ["PAYING RENT"],
+      "category": "stress",
+      "sub_category": "C"
+    }
+  ]
+}

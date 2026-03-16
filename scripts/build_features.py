@@ -1,11 +1,12 @@
 """
 scripts/build_features.py
 --------------------------
-Step 1: Parse the Catan rulebook into semantic chunks, embed them with
-sentence-transformers, and store the FAISS index + chunk metadata.
+Parse a board game rulebook into semantic chunks, embed them with
+sentence-transformers, and store a FAISS index + chunk metadata.
 
-Run once before using the RAG pipeline (from project root):
-    .venv/bin/python scripts/build_features.py
+Run once per game before using the RAG pipeline (from project root):
+    .venv/bin/python scripts/build_features.py catan
+    .venv/bin/python scripts/build_features.py monopoly
 """
 
 import re
@@ -13,48 +14,23 @@ import json
 import sys
 from pathlib import Path
 
-RULEBOOK_PATH = "data/raw/catan_rulebook.txt"
-CHUNKS_PATH = "data/processed/chunks.json"
-INDEX_PATH = "models/faiss.index"
-
 
 # ---------------------------------------------------------------------------
-# Game Rules parsing
+# Shared utility
 # ---------------------------------------------------------------------------
 
-# Each tuple is (chunk_title, regex_to_locate_the_section_start).
-# Sections are ordered as they appear in the document.
-GAME_RULES_SECTIONS = [
-    ("GAME COMPONENTS",
-     r"GAME COMPONENTS"),
-    ("ISLAND CONSTRUCTION AND SETUP",
-     r"CONSTRUCTING THE ISLAND"),
-    ("TURN OVERVIEW",
-     r"TURN OVERVIEW"),
-    ("RESOURCE PRODUCTION",
-     r"1\. RESOURCE PRODUCTION"),
-    ("TRADE (Domestic and Maritime)",
-     r"2\. TRADE"),
-    ("BUILD (Roads, Settlements, Cities, Development Cards)",
-     r"3\. BUILD"),
-    ('ROLLING A "7" AND ACTIVATING THE ROBBER',
-     r'a\) Rolling a'),
-    ("PLAYING DEVELOPMENT CARDS (Knight, Progress, Victory Point)",
-     r"b\) Playing Development Cards"),
-    ("ENDING THE GAME",
-     r"ENDING THE GAME"),
-]
-
-
-def parse_game_rules_chunks(text: str) -> list[dict]:
-    """Split the Game Rules section into semantic chunks."""
+def _position_based_chunks(text: str, sections: list[tuple], prefix: str) -> list[dict]:
+    """
+    Generic position-based chunker.
+    Finds each section header via regex, then slices the text between headers.
+    """
     positions = []
-    for title, pattern in GAME_RULES_SECTIONS:
+    for title, pattern in sections:
         m = re.search(pattern, text)
         if m:
             positions.append((m.start(), title))
         else:
-            print(f"  WARNING: could not locate '{title}' in Game Rules", file=sys.stderr)
+            print(f"  WARNING: could not locate '{title}'", file=sys.stderr)
 
     positions.sort(key=lambda x: x[0])
 
@@ -63,30 +39,31 @@ def parse_game_rules_chunks(text: str) -> list[dict]:
         end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
         content = text[start:end].strip()
         if content:
-            chunks.append({
-                "title": f"Game Rules: {title}",
-                "text": content,
-                "source": "Game Rules",
-            })
+            chunks.append({"title": f"{prefix}: {title}", "text": content, "source": prefix})
     return chunks
 
 
 # ---------------------------------------------------------------------------
-# Almanac parsing
+# Catan chunkers
 # ---------------------------------------------------------------------------
 
-def is_almanac_header(line: str) -> bool:
-    """
-    Return True if the line looks like an ALL-CAPS Almanac entry header.
-    Filters out separators (=====), the 'ALMANAC (Pages...)' title line,
-    and any line with significant lowercase content.
-    """
+_CATAN_GAME_RULES_SECTIONS = [
+    ("GAME COMPONENTS",                                           r"GAME COMPONENTS"),
+    ("ISLAND CONSTRUCTION AND SETUP",                            r"CONSTRUCTING THE ISLAND"),
+    ("TURN OVERVIEW",                                             r"TURN OVERVIEW"),
+    ("RESOURCE PRODUCTION",                                       r"1\. RESOURCE PRODUCTION"),
+    ("TRADE (Domestic and Maritime)",                             r"2\. TRADE"),
+    ("BUILD (Roads, Settlements, Cities, Development Cards)",     r"3\. BUILD"),
+    ('ROLLING A "7" AND ACTIVATING THE ROBBER',                  r'a\) Rolling a'),
+    ("PLAYING DEVELOPMENT CARDS (Knight, Progress, Victory Point)", r"b\) Playing Development Cards"),
+    ("ENDING THE GAME",                                           r"ENDING THE GAME"),
+]
+
+
+def _is_almanac_header(line: str) -> bool:
+    """Return True if the line looks like an ALL-CAPS Almanac entry header."""
     line = line.strip()
-    if not line:
-        return False
-    if "=" in line:
-        return False
-    if "Pages" in line:
+    if not line or "=" in line or "Pages" in line:
         return False
     if len(line) < 3 or len(line) > 65:
         return False
@@ -98,69 +75,97 @@ def is_almanac_header(line: str) -> bool:
     return upper / total_alpha >= 0.80
 
 
-def parse_almanac_chunks(text: str) -> list[dict]:
-    """Split the Almanac section into one chunk per entry."""
+def _parse_catan_almanac(text: str) -> list[dict]:
+    """Split the Catan Almanac section into one chunk per entry."""
     chunks = []
-    current_title: str | None = None
+    current_title = None
     current_lines: list[str] = []
 
     for line in text.split("\n"):
         stripped = line.strip()
-        if stripped and is_almanac_header(stripped):
-            # Save the previous entry
+        if stripped and _is_almanac_header(stripped):
             if current_title and current_lines:
                 content = "\n".join(current_lines).strip()
                 if len(content) > 30:
-                    chunks.append({
-                        "title": f"Almanac: {current_title}",
-                        "text": content,
-                        "source": "Almanac",
-                    })
+                    chunks.append({"title": f"Almanac: {current_title}", "text": content, "source": "Almanac"})
             current_title = stripped
             current_lines = [stripped]
         else:
             if current_title is not None:
                 current_lines.append(line)
 
-    # Flush the last entry
     if current_title and current_lines:
         content = "\n".join(current_lines).strip()
         if len(content) > 30:
-            chunks.append({
-                "title": f"Almanac: {current_title}",
-                "text": content,
-                "source": "Almanac",
-            })
+            chunks.append({"title": f"Almanac: {current_title}", "text": content, "source": "Almanac"})
 
     return chunks
 
 
-# ---------------------------------------------------------------------------
-# Top-level chunker
-# ---------------------------------------------------------------------------
-
-def chunk_rulebook(filepath: str) -> list[dict]:
+def chunk_catan(filepath: str) -> list[dict]:
     """Parse the full Catan rulebook into semantic chunks."""
     with open(filepath) as f:
         text = f.read()
 
     almanac_marker = "ALMANAC (Pages 6-15)"
     if almanac_marker not in text:
-        print("WARNING: Could not find ALMANAC marker; treating entire file as Game Rules.",
-              file=sys.stderr)
-        return parse_game_rules_chunks(text)
+        print("WARNING: Could not find ALMANAC marker; treating entire file as Game Rules.", file=sys.stderr)
+        return _position_based_chunks(text, _CATAN_GAME_RULES_SECTIONS, "Game Rules")
 
     split_pos = text.index(almanac_marker)
-    game_rules_text = text[:split_pos]
-    almanac_text = text[split_pos:]
-
-    chunks = parse_game_rules_chunks(game_rules_text)
-    chunks += parse_almanac_chunks(almanac_text)
+    chunks = _position_based_chunks(text[:split_pos], _CATAN_GAME_RULES_SECTIONS, "Game Rules")
+    chunks += _parse_catan_almanac(text[split_pos:])
     return chunks
 
 
 # ---------------------------------------------------------------------------
-# Embedding + FAISS index
+# Monopoly chunker
+# ---------------------------------------------------------------------------
+
+_MONOPOLY_SECTIONS = [
+    ("OVERVIEW",                    r"MONOPOLY - Official Rules"),
+    ("SPEED DIE RULES",             r"SPEED DIE RULES"),
+    ("OBJECT",                      r"OBJECT:"),
+    ("PREPARATION",                 r"PREPARATION:"),
+    ("THE BANKER",                  r"BANKER:"),
+    ("THE BANK",                    r"THE BANK:"),
+    ("THE PLAY",                    r"THE PLAY:"),
+    ("GO",                          r'"GO":'),
+    ("BUYING PROPERTY",             r"BUYING PROPERTY:"),
+    ("PAYING RENT",                 r"PAYING RENT:"),
+    ("CHANCE AND COMMUNITY CHEST",  r'"CHANCE" AND'),
+    ("INCOME TAX",                  r'"INCOME TAX":'),
+    ("JAIL",                        r'"JAIL":'),
+    ("FREE PARKING",                r'"FREE PARKING":'),
+    ("HOUSES",                      r"HOUSES:"),
+    ("HOTELS",                      r"HOTELS:"),
+    ("BUILDING SHORTAGES",          r"BUILDING SHORTAGES:"),
+    ("SELLING PROPERTY",            r"SELLING PROPERTY:"),
+    ("MORTGAGES",                   r"MORTGAGES:"),
+    ("BANKRUPTCY",                  r"BANKRUPTCY:"),
+    ("MISCELLANEOUS",               r"MISCELLANEOUS:"),
+]
+
+
+def chunk_monopoly(filepath: str) -> list[dict]:
+    """Parse the Monopoly rulebook into semantic chunks."""
+    with open(filepath) as f:
+        text = f.read()
+    return _position_based_chunks(text, _MONOPOLY_SECTIONS, "Monopoly")
+
+
+# ---------------------------------------------------------------------------
+# Game registry — add new games here
+# ---------------------------------------------------------------------------
+
+GAMES: dict[str, callable] = {
+    "catan":    chunk_catan,
+    "monopoly": chunk_monopoly,
+}
+
+
+# ---------------------------------------------------------------------------
+# Embedding + FAISS index  (deep learning retriever)
 # ---------------------------------------------------------------------------
 
 def build_faiss_index(chunks: list[dict]):
@@ -179,9 +184,7 @@ def build_faiss_index(chunks: list[dict]):
     print(f"Embedding {len(texts)} chunks...")
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
 
-    # Normalize → use IndexFlatIP as cosine similarity
     faiss.normalize_L2(embeddings)
-
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
@@ -190,28 +193,70 @@ def build_faiss_index(chunks: list[dict]):
 
 
 # ---------------------------------------------------------------------------
+# TF-IDF index  (classical ML retriever)
+# ---------------------------------------------------------------------------
+
+def build_tfidf_index(chunks: list[dict], out_dir: Path):
+    """Fit a TF-IDF vectorizer on all chunks and save the matrix + vectorizer."""
+    try:
+        import pickle
+        import scipy.sparse
+        from sklearn.feature_extraction.text import TfidfVectorizer
+    except ImportError as e:
+        print(f"Missing dependency: {e}\nRun: .venv/bin/pip install -r requirements.txt")
+        sys.exit(1)
+
+    texts = [c["text"] for c in chunks]
+    print(f"Building TF-IDF index over {len(texts)} chunks...")
+
+    vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+    matrix = vectorizer.fit_transform(texts)
+    print(f"TF-IDF matrix: {matrix.shape[0]} docs × {matrix.shape[1]} terms")
+
+    scipy.sparse.save_npz(str(out_dir / "tfidf_matrix.npz"), matrix)
+    with open(str(out_dir / "tfidf_vectorizer.pkl"), "wb") as f:
+        pickle.dump(vectorizer, f)
+
+    print(f"Saved TF-IDF artifacts -> '{out_dir}'")
+    return vectorizer, matrix
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    print(f"Reading rulebook from '{RULEBOOK_PATH}'...")
-    chunks = chunk_rulebook(RULEBOOK_PATH)
+    import argparse
+    parser = argparse.ArgumentParser(description="Build FAISS index for a board game rulebook.")
+    parser.add_argument("game", choices=list(GAMES.keys()), help="Game to index")
+    args = parser.parse_args()
+
+    game = args.game
+    rulebook_path = f"data/raw/{game}_rulebook.txt"
+    out_dir = Path(f"models/{game}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    chunks_path = str(out_dir / "chunks.json")
+    index_path  = str(out_dir / "faiss.index")
+
+    print(f"Reading rulebook from '{rulebook_path}'...")
+    chunks = GAMES[game](rulebook_path)
 
     print(f"\nCreated {len(chunks)} chunks:\n")
     for i, c in enumerate(chunks):
-        tag = "GR" if c["source"] == "Game Rules" else "AL"
-        print(f"  {i+1:2d}. [{tag}] {c['title']:<65}  ({len(c['text'])} chars)")
+        print(f"  {i+1:2d}. {c['title']:<70}  ({len(c['text'])} chars)")
 
-    with open(CHUNKS_PATH, "w") as f:
+    with open(chunks_path, "w") as f:
         json.dump(chunks, f, indent=2, ensure_ascii=False)
-    print(f"\nSaved chunks  → '{CHUNKS_PATH}'")
+    print(f"\nSaved chunks  -> '{chunks_path}'")
 
     import faiss
     index = build_faiss_index(chunks)
-    faiss.write_index(index, INDEX_PATH)
-    print(f"Saved index   → '{INDEX_PATH}'")
+    faiss.write_index(index, index_path)
+    print(f"Saved index   -> '{index_path}'")
 
-    print("\nDone. You can now run: .venv/bin/python scripts/model.py 'your question here'")
+    build_tfidf_index(chunks, out_dir)
+
+    print(f"\nDone. You can now run: .venv/bin/python scripts/model.py {game} 'your question'")
 
 
 if __name__ == "__main__":

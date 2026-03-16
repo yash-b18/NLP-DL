@@ -1,54 +1,103 @@
-# Catan Rules Assistant — RAG System with Evaluation
+# Board Game Rules Assistant — Multi-Game RAG System
 
-A Retrieval-Augmented Generation (RAG) system that answers natural language questions about the board game **Catan** using the official rulebook as its knowledge base.
+A Retrieval-Augmented Generation (RAG) system that answers natural language questions about board game rules using official rulebooks as the knowledge base. Currently supports **Catan** and **Monopoly**, with a game-agnostic architecture designed to support additional games.
 
-The core goal is not just a working Q&A bot — it is a **rigorously evaluated** system that demonstrates how two complementary evaluation strategies (correctness testing and adversarial stress testing) reveal specific failure modes and guide concrete improvements.
+Three retrieval strategies are implemented and compared — a naive baseline, a classical ML approach, and a deep learning approach — with rigorous evaluation per game to reveal failure modes and guide improvements.
 
 ---
 
 ## What It Does
 
-1. **Chunks** the Catan rulebook into 42 semantically meaningful sections (9 Game Rules sections + 33 Almanac entries)
-2. **Embeds** each chunk using a sentence transformer model and indexes them in a FAISS vector store
-3. **Retrieves** the top-3 most relevant chunks for any user question using cosine similarity
+1. **Chunks** each game's rulebook into semantically meaningful sections using game-specific structure-aware parsing
+2. **Indexes** chunks using three retrieval strategies (dense embeddings, TF-IDF, random)
+3. **Retrieves** the top-k most relevant chunks for any user question
 4. **Generates** a grounded answer using GPT-4o-mini, instructed to cite sources and say "the rules don't specify" when context is insufficient
-5. **Evaluates** the system on 32 curated questions across two test sets, computing retrieval precision, coverage, and hallucination rate
+5. **Evaluates** the system on 32 curated questions per game across two test sets
+6. **Experiments** with k-sensitivity analysis comparing all three retrievers
 
 ---
 
 ## Tech Stack
 
-| Component      | Technology                                       |
-| -------------- | ------------------------------------------------ |
-| Embeddings     | `sentence-transformers` — `all-MiniLM-L6-v2`     |
-| Vector store   | `faiss-cpu` — in-memory cosine similarity index  |
-| LLM            | OpenAI `gpt-4o-mini` via the `openai` Python SDK |
-| Env management | `python-dotenv`                                  |
-| Language       | Python 3.10+                                     |
-| Runtime        | Isolated `.venv` virtual environment             |
+| Component         | Technology                                        |
+| ----------------- | ------------------------------------------------- |
+| Embeddings (DL)   | `sentence-transformers` — `all-MiniLM-L6-v2`      |
+| Classical ML      | `scikit-learn` — TF-IDF + cosine similarity       |
+| Vector store      | `faiss-cpu` — per-game cosine similarity index    |
+| LLM               | OpenAI `gpt-4o-mini` via the `openai` Python SDK  |
+| UI                | `streamlit`                                       |
+| Env management    | `python-dotenv`                                   |
+| Language          | Python 3.10+                                      |
+| Runtime           | Isolated `.venv` virtual environment              |
+
+---
+
+## Modeling Approaches
+
+Three retrieval strategies are implemented, all sharing the same GPT-4o-mini generation step:
+
+| Approach | Strategy | Description |
+|---|---|---|
+| **Naive baseline** | `random` | Randomly selects k chunks — no query signal |
+| **Classical ML** | `tfidf` | TF-IDF bag-of-words + cosine similarity |
+| **Deep learning** | `dense` | sentence-transformer dense embeddings + FAISS |
+
+**k=3 comparison across both games (full evaluation):**
+
+| Retriever | Catan P@3 | Catan Correctness | Monopoly P@3 | Monopoly Correctness |
+|---|---|---|---|---|
+| Random (baseline) | 25% | 23% | 12% | 28% |
+| TF-IDF (classical ML) | 97% | 72% | 91% | 88% |
+| Dense (deep learning) | 100% | 86% | 94% | 95% |
+
+**Hallucination Rate (all retrievers, both games):** 0%
 
 ---
 
 ## Project Structure
 
 ```
-├── catan_rulebook.txt       # Official Catan rulebook (source document)
-├── requirements.txt         # Python dependencies
-├── setup.sh                 # Creates .venv and installs all deps
-├── .env                     # API key (OPENAI_API_KEY — not committed)
+├── main.py                          # Streamlit UI — run this to launch the app
+├── requirements.txt                 # Python dependencies
+├── setup.sh                         # Creates .venv and installs all deps
+├── .env                             # API key (OPENAI_API_KEY — not committed)
 │
-├── chunk_and_index.py       # Step 1: parse rulebook → 42 chunks → FAISS index
-├── rag_pipeline.py          # Step 2: retrieve top-k + generate with OpenAI
+├── scripts/
+│   ├── build_features.py            # Parse rulebook → chunks → FAISS + TF-IDF indexes
+│   ├── model.py                     # RAG pipeline: retrieve (dense/tfidf/random) + generate
+│   ├── evaluate.py                  # Run evaluation → {game}[_{retriever}]_results.csv
+│   ├── experiment.py                # k-sensitivity analysis across all three retrievers
+│   └── demo.py                      # Interactive CLI demo
 │
-├── eval_data.json           # 20 correctness Qs + 12 stress-test Qs with gold answers
-├── evaluate.py              # Runs full evaluation → results.csv + summary stats
+├── data/
+│   ├── raw/
+│   │   ├── catan_rulebook.txt       # Official Catan rulebook
+│   │   ├── catan_eval.json          # 20 correctness Qs + 12 stress-test Qs (Catan)
+│   │   ├── monopoly_rulebook.txt    # Official Monopoly rulebook
+│   │   └── monopoly_eval.json       # 20 correctness Qs + 12 stress-test Qs (Monopoly)
+│   └── outputs/
+│       ├── catan_results.csv                      # Catan dense eval results (scored)
+│       ├── catan_tfidf_results.csv                # Catan TF-IDF eval results (scored)
+│       ├── catan_random_results.csv               # Catan random eval results (scored)
+│       ├── monopoly_results.csv                   # Monopoly dense eval results (scored)
+│       ├── monopoly_tfidf_results.csv             # Monopoly TF-IDF eval results (scored)
+│       ├── monopoly_random_results.csv            # Monopoly random eval results (scored)
+│       └── catan_experiment_k_sensitivity.csv     # k-sensitivity experiment results
 │
-├── demo.py                  # Interactive class demo (curated questions + free input)
-├── analysis.md              # Written error analysis: failure modes + proposed fixes
+├── models/
+│   ├── catan/
+│   │   ├── chunks.json              # Generated: 42 parsed Catan chunks
+│   │   ├── faiss.index              # Generated: Catan FAISS vector index
+│   │   ├── tfidf_matrix.npz         # Generated: Catan TF-IDF sparse matrix
+│   │   └── tfidf_vectorizer.pkl     # Generated: Catan TF-IDF vectorizer
+│   └── monopoly/
+│       ├── chunks.json              # Generated: 21 parsed Monopoly chunks
+│       ├── faiss.index              # Generated: Monopoly FAISS vector index
+│       ├── tfidf_matrix.npz         # Generated: Monopoly TF-IDF sparse matrix
+│       └── tfidf_vectorizer.pkl     # Generated: Monopoly TF-IDF vectorizer
 │
-├── chunks.json              # Generated: 42 parsed rulebook chunks
-├── faiss.index              # Generated: FAISS vector index
-└── results.csv              # Generated: evaluation results with scores and notes
+└── notebooks/
+    └── analysis.md                  # Error analysis: failure modes + proposed fixes
 ```
 
 ---
@@ -61,59 +110,81 @@ The core goal is not just a working Q&A bot — it is a **rigorously evaluated**
 bash setup.sh
 ```
 
-This creates a `.venv/` virtual environment and installs all packages. Nothing is installed globally.
+Creates a `.venv/` virtual environment and installs all packages. Nothing is installed globally.
 
 ### 2. Add your OpenAI API key
 
-Edit `.env`:
+Create a `.env` file in the project root:
 
 ```
 OPENAI_API_KEY=sk-your-key-here
 ```
 
-### 3. Build the index (one time)
+### 3. Build the indexes for each game (one time per game)
 
 ```bash
-.venv/bin/python chunk_and_index.py
+.venv/bin/python scripts/build_features.py catan
+.venv/bin/python scripts/build_features.py monopoly
 ```
 
-Parses the rulebook into 42 chunks, embeds them, and saves `chunks.json` + `faiss.index`.
+Builds both the FAISS (dense) and TF-IDF (classical ML) indexes. Saved to `models/{game}/`.
 
 ### 4. Ask a single question
 
 ```bash
-.venv/bin/python rag_pipeline.py "What resources do you need to build a settlement?"
+.venv/bin/python scripts/model.py catan "What resources do you need to build a settlement?"
+.venv/bin/python scripts/model.py monopoly "How much money does each player start with?" --retriever tfidf
+.venv/bin/python scripts/model.py catan "What happens when you roll a 7?" --retriever random
 ```
 
 ### 5. Run the full evaluation
 
 ```bash
-.venv/bin/python evaluate.py
+# Dense (deep learning) — default
+.venv/bin/python scripts/evaluate.py catan
+.venv/bin/python scripts/evaluate.py monopoly
+
+# TF-IDF (classical ML)
+.venv/bin/python scripts/evaluate.py catan --retriever tfidf
+
+# Random (naive baseline)
+.venv/bin/python scripts/evaluate.py catan --retriever random
 ```
 
-Runs all 32 questions, prints metrics, writes `results.csv`.
-
-### 6. Run the interactive demo
+### 6. Run the k-sensitivity experiment (no API calls)
 
 ```bash
-.venv/bin/python demo.py
+.venv/bin/python scripts/experiment.py catan
+.venv/bin/python scripts/experiment.py monopoly
+.venv/bin/python scripts/experiment.py all
 ```
 
-Walks through 4 curated questions (including a known failure), then goes interactive.
+Compares Precision@k and Coverage across k=1–10 for all three retrievers. No OpenAI calls needed.
+
+### 7. Launch the UI
+
+```bash
+.venv/bin/streamlit run main.py
+```
+
+The UI includes a game selector and a retriever selector. Evaluation metrics in the sidebar update based on the selected game and retriever.
+
+### 8. Run the interactive demo
+
+```bash
+.venv/bin/python scripts/demo.py catan
+.venv/bin/python scripts/demo.py monopoly
+```
 
 ---
 
 ## Evaluation Design
 
-Two complementary test sets are used:
+Two complementary test sets are used per game:
 
 ### Set 1 — Correctness Questions (20 questions)
 
 Straightforward factual questions with single, unambiguous answers in the rulebook.
-
-**Example:**
-
-> "What resources do you need to build a settlement?" → _Brick, Lumber, Wool, and Grain_
 
 **Metrics:** Answer correctness (0 / 0.5 / 1), Retrieval Precision@3
 
@@ -121,77 +192,64 @@ Straightforward factual questions with single, unambiguous answers in the rulebo
 
 Adversarial questions in three sub-categories:
 
-| Sub-category          | Description                            | Example                                                   |
-| --------------------- | -------------------------------------- | --------------------------------------------------------- |
-| **A — Multi-section** | Requires synthesizing 2+ chunks        | "I roll a 7 and want to play a knight card — what first?" |
-| **B — Edge cases**    | Rules address it but it's easy to miss | "Can I trade 2 wool for 1 wool?"                          |
-| **C — Unanswerable**  | Rules are genuinely silent             | "Can I make a binding future-turn trade promise?"         |
+| Sub-category          | Description                            | Example                                                      |
+| --------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| **A — Multi-section** | Requires synthesizing 2+ chunks        | "I roll a 7 and want to play a knight card — what first?"    |
+| **B — Edge cases**    | Rules address it but it's easy to miss | "Can I trade 2 wool for 1 wool?"                             |
+| **C — Unanswerable**  | Rules are genuinely silent             | "What happens if two players tie on the initial dice roll?"  |
 
-**Metrics:** Answer correctness, Retrieval Coverage (all required chunks found?), Hallucination Rate (Category C)
+**Metrics:** Answer correctness, Retrieval Coverage, Hallucination Rate (Category C)
 
 ---
 
 ## Results
 
-| Category                 | N      | Retrieval Precision@3 | Avg Correctness |
-| ------------------------ | ------ | --------------------- | --------------- |
-| Correctness questions    | 20     | 100%                  | 0.78 / 1.0      |
-| Stress A — multi-section | 3      | 100%                  | 0.50 / 1.0      |
-| Stress B — edge cases    | 5      | 100%                  | 0.90 / 1.0      |
-| Stress C — unanswerable  | 4      | 100%                  | 0.88 / 1.0      |
-| **Overall**              | **32** | **100%**              | **0.75 / 1.0**  |
+### Catan
 
-**Retrieval Coverage** (all required chunks found for multi-section Qs): **78%**
+| Category                 | N      | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+| ------------------------ | ------ | --------- | ------------- | ---------- | -------------- | ---------- | -------------- |
+| Correctness questions    | 20     | 100%      | 88%           | 95%        | 85%            | 20%        | 18%            |
+| Stress A — multi-section | 3      | 100%      | 67%           | 100%       | 0%             | 33%        | 50%            |
+| Stress B — edge cases    | 5      | 100%      | 100%          | 100%       | 70%            | 0%         | 0%             |
+| Stress C — unanswerable  | 4      | 100%      | 75%           | 100%       | 62%            | 75%        | 62%            |
+| **Overall**              | **32** | **100%**  | **86%**       | **97%**    | **72%**        | **25%**    | **23%**        |
 
-**Hallucination Rate** (Category C — model invented a definitive rule): **0%**
+### Monopoly
 
----
+| Category                 | N      | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+| ------------------------ | ------ | --------- | ------------- | ---------- | -------------- | ---------- | -------------- |
+| Correctness questions    | 20     | 95%       | 92%           | 90%        | 85%            | 15%        | 15%            |
+| Stress A — multi-section | 3      | 100%      | 100%          | 100%       | 100%           | 33%        | 33%            |
+| Stress B — edge cases    | 4      | 100%      | 100%          | 100%       | 75%            | 0%         | 0%             |
+| Stress C — unanswerable  | 5      | 80%       | 100%          | 80%        | 100%           | 0%         | 100%           |
+| **Overall**              | **32** | **94%**   | **95%**       | **91%**    | **88%**        | **12%**    | **28%**        |
 
-## Key Findings
-
-Retrieval Precision@3 was 100% — at least one correct chunk was always retrieved. The failures are almost entirely **generation problems**, not retrieval problems. This distinction was only possible because the evaluation measured retrieval and correctness independently.
-
-### Failure Modes Identified
-
-| Mode                    | Questions     | Root Cause                                            | Proposed Fix                                      |
-| ----------------------- | ------------- | ----------------------------------------------------- | ------------------------------------------------- |
-| Over-cautious grounding | C04, C16      | Model abstains even when answer is clearly in context | Relax "I don't know" instruction in system prompt |
-| Retrieval miss          | C08, C09, S02 | Correct chunk not in top-3 (semantic mismatch)        | Increase k to 5; enrich chunk headers             |
-| Multi-hop reasoning     | S01, S06      | Confused synthesis across two chunks                  | Query decomposition                               |
-| Physical card gap       | C09           | Building costs only on physical card, not in text     | Add synthetic "building costs" chunk              |
-
-Full analysis in [`analysis.md`](analysis.md).
+**Hallucination Rate (all retrievers, both games):** 0%
 
 ---
 
 ## Chunking Strategy
 
-Rather than naive fixed-size splitting, the rulebook is split along its own structure:
+Each game uses a structure-aware chunker tailored to its rulebook format:
 
-- **Game Rules** (pages 2–5): 9 sections matched by known header patterns (`1. RESOURCE PRODUCTION`, `a) Rolling a "7"`, etc.)
-- **Almanac** (pages 6–15): 33 entries auto-detected by an ≥80%-uppercase line heuristic
+**Catan (42 chunks)**
+- Game Rules (9 chunks): sections matched by known header regex patterns
+- Almanac (33 chunks): entries auto-detected by ≥80%-uppercase line heuristic
 
-This produces chunks that align with how players actually look up rules.
+**Monopoly (21 chunks)**
+- 21 named sections matched by known header patterns (`PREPARATION:`, `"JAIL":`, `MORTGAGES:`, etc.)
+
+Adding a new game requires: a rulebook `.txt` file, a chunker function registered in `GAMES`, and an eval `.json` file — nothing else in the pipeline changes.
 
 ---
 
-## Example Interaction
+## Key Findings
 
-```
-Q: What happens when you roll a 7?
+- **Dense retrieval dominates** on both games: 100%/94% Precision@3 vs 97%/91% for TF-IDF and 25%/12% for random
+- **TF-IDF is competitive on correctness** — 85% correctness on Catan vs 88% on Monopoly, degrading mainly on multi-section stress questions where semantic retrieval is critical
+- **Random baseline collapses on edge-case questions** — 0% P@3 on Stress B for both games; it only succeeds on unanswerable (C) questions where abstention is always correct
+- **Failures are generation problems, not retrieval problems** — TF-IDF achieved 97% P@3 on Catan but only 72% correctness; the gap is from correct chunks being retrieved but answers still failing
+- **Hallucination resistance is strong** across all 6 game/retriever combinations — the grounding prompt prevents rule invention regardless of retrieval quality
+- **Monopoly is easier than Catan** — dense correctness 95% vs 86%; Monopoly's rulebook is more linear with fewer cross-references to physical components
 
-Retrieved chunks:
-  [0.712]  Almanac: ROLLING A "7" AND ACTIVATING THE ROBBER
-  [0.489]  Almanac: NUMBER TOKENS
-  [0.441]  Game Rules: ENDING THE GAME
-
-Answer:
-When you roll a "7," the following occurs:
-
-1. No players receive resources.
-2. Every player with more than 7 resource cards must discard half (rounded down).
-3. You must move the robber to any other terrain hex, then steal 1 resource card
-   from a player with a settlement or city adjacent to that hex.
-
-According to [Almanac: ROLLING A "7" AND ACTIVATING THE ROBBER]...
-```
+Full error analysis in [`notebooks/analysis.md`](notebooks/analysis.md).
