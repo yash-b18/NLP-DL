@@ -1,5 +1,5 @@
 """
-main.py — Streamlit UI for the Catan RAG system.
+main.py — Streamlit UI for the Board Game RAG system.
 
 Run (from project root):
     .venv/bin/streamlit run main.py
@@ -17,24 +17,47 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Catan Rules Assistant",
+    page_title="Board Game Rules Assistant",
     page_icon="🎲",
     layout="wide",
 )
 
-# ── Load model / index once ───────────────────────────────────────────────────
+# ── Supported games ───────────────────────────────────────────────────────────
+GAMES = ["catan", "monopoly"]
+
+EXAMPLES: dict[str, list[str]] = {
+    "catan": [
+        "What resources do you need to build a settlement?",
+        "What happens when you roll a 7?",
+        "Can players trade with each other when it is not their turn?",
+        "Can a player make a binding promise to give resources on a future turn?",
+        "My road is 6 segments long and an opponent breaks it into 4 and 2. Do I lose Longest Road?",
+        "Can I play a knight card before I roll the dice?",
+    ],
+    "monopoly": [
+        "How much money does each player start with?",
+        "What happens when you pass GO?",
+        "How do you get out of jail?",
+        "What does landing on Free Parking give you?",
+        "Can you collect rent while you are in jail?",
+        "Can players lend money to each other?",
+    ],
+}
+
+# ── Cached loaders ────────────────────────────────────────────────────────────
+
 @st.cache_resource(show_spinner="Loading model and index…")
-def load_pipeline():
+def load_pipeline(game: str):
     from model import retrieve, generate, _load
-    _load()
+    _load(game)
     return retrieve, generate
 
 
 @st.cache_data(show_spinner=False)
-def load_eval_results():
-    path = "data/outputs/results.csv"
+def load_eval_results(game: str):
+    path = f"data/outputs/{game}_results.csv"
     if not os.path.exists(path):
         return None
     rows = []
@@ -45,30 +68,37 @@ def load_eval_results():
 
 
 @st.cache_data(show_spinner=False)
-def load_chunks():
-    with open("data/processed/chunks.json") as f:
+def load_chunks(game: str):
+    path = f"models/{game}/chunks.json"
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
         return json.load(f)
 
 
-# ── Example questions ─────────────────────────────────────────────────────────
-EXAMPLES = [
-    "What resources do you need to build a settlement?",
-    "What happens when you roll a 7?",
-    "Can players trade with each other when it is not their turn?",
-    "Can a player make a binding promise to give resources on a future turn?",
-    "My road is 6 segments long and an opponent breaks it into 4 and 2. Do I lose Longest Road?",
-    "Can I play a knight card before I roll the dice?",
-]
-
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("🎲 Catan RAG")
+    st.title("🎲 Board Game RAG")
+
+    st.divider()
+
+    selected_game = st.selectbox(
+        "Select game",
+        options=GAMES,
+        format_func=lambda g: g.title(),
+        key="selected_game",
+    )
+
+    # Clear the question box whenever the game changes
+    if st.session_state.get("_last_game") != selected_game:
+        st.session_state["question"] = ""
+        st.session_state["_last_game"] = selected_game
 
     st.divider()
     st.subheader("System")
     st.markdown(
-        """
-        - **Chunks:** 42 (9 Game Rules + 33 Almanac)
+        f"""
+        - **Game:** {selected_game.title()}
         - **Embeddings:** all-MiniLM-L6-v2
         - **Vector store:** FAISS (cosine)
         - **LLM:** gpt-4o-mini
@@ -79,10 +109,10 @@ with st.sidebar:
     st.divider()
     st.subheader("Evaluation Results")
 
-    results = load_eval_results()
+    results = load_eval_results(selected_game)
     if results:
         correctness = [r for r in results if r["category"] == "correctness"]
-        stress = [r for r in results if r["category"] == "stress"]
+        stress      = [r for r in results if r["category"] == "stress"]
 
         def avg_score(group):
             scores = [float(r["correctness_score"]) for r in group if r["correctness_score"] != ""]
@@ -94,37 +124,34 @@ with st.sidebar:
 
         col3, col4 = st.columns(2)
         col3.metric("Correctness Qs", f"{avg_score(correctness):.0%}")
-        col4.metric("Stress Test", f"{avg_score(stress):.0%}")
+        col4.metric("Stress Test",    f"{avg_score(stress):.0%}")
 
         st.divider()
         if st.toggle("Show all results"):
             for r in results:
                 score = r.get("correctness_score", "")
                 color = "🟢" if score == "1" else "🟡" if score == "0.5" else "🔴"
-                st.markdown(
-                    f"{color} **{r['id']}** — {r['question'][:55]}…"
-                    if len(r['question']) > 55
-                    else f"{color} **{r['id']}** — {r['question']}"
-                )
+                label = r["question"][:55] + "…" if len(r["question"]) > 55 else r["question"]
+                st.markdown(f"{color} **{r['id']}** — {label}")
     else:
-        st.info("Run `scripts/evaluate.py` to see results here.")
+        st.info(f"Run `scripts/evaluate.py {selected_game}` to see results here.")
 
 # ── Main area ─────────────────────────────────────────────────────────────────
-st.title("🎲 Catan Rules Assistant")
+st.title(f"🎲 {selected_game.title()} Rules Assistant")
 st.markdown(
-    "Ask any question about the Catan rulebook. "
+    "Ask any question about the rulebook. "
     "The system retrieves the most relevant rule sections and generates a grounded answer."
 )
 
 # Example question buttons
 st.markdown("**Try an example:**")
-cols = st.columns(3)
+cols   = st.columns(3)
 clicked = None
-for i, ex in enumerate(EXAMPLES):
+for i, ex in enumerate(EXAMPLES[selected_game]):
     if cols[i % 3].button(ex[:45] + ("…" if len(ex) > 45 else ""), key=f"ex_{i}", use_container_width=True):
         clicked = ex
 
-# Text input — pre-fill from clicked example or session state
+# Text input
 if "question" not in st.session_state:
     st.session_state.question = ""
 if clicked:
@@ -144,21 +171,20 @@ ask = st.button("Ask", type="primary", use_container_width=False)
 if ask and question.strip():
     st.session_state.question = question
 
-    retrieve_fn, generate_fn = load_pipeline()
+    retrieve_fn, generate_fn = load_pipeline(selected_game)
 
     with st.spinner("Retrieving relevant rules…"):
-        retrieved = retrieve_fn(question, k=3)
+        retrieved = retrieve_fn(question, game=selected_game, k=3)
 
     with st.spinner("Generating answer…"):
-        answer = generate_fn(question, retrieved)
+        answer = generate_fn(question, retrieved, game=selected_game)
 
     st.divider()
 
-    # Answer box
     st.subheader("Answer")
     st.success(answer)
 
-    # Retrieved chunks — only show if the model found an answer in the rulebook
+    # Only show retrieved chunks if the model found an answer
     ABSTAIN_PHRASES = [
         "don't specify", "doesn't specify", "not specify",
         "rules don't", "rules do not", "not addressed",
@@ -170,17 +196,16 @@ if ask and question.strip():
 
     if not abstained:
         st.subheader("Retrieved rule sections")
-        chunks_data = load_chunks()
+        chunks_data = load_chunks(selected_game)
 
         for chunk in retrieved:
-            score = chunk["retrieval_score"]
-            title = chunk["title"]
-            idx = chunk["chunk_idx"]
+            score     = chunk["retrieval_score"]
+            title     = chunk["title"]
+            idx       = chunk["chunk_idx"]
             full_text = chunks_data[idx]["text"] if idx < len(chunks_data) else chunk.get("text", "")
 
-            bar_pct = int(score * 100)
             with st.expander(f"[{score:.3f}]  {title}"):
-                st.progress(bar_pct, text=f"Similarity: {score:.3f}")
+                st.progress(int(score * 100), text=f"Similarity: {score:.3f}")
                 st.markdown(
                     f"<div style='font-size:0.88rem; color:#ccc; white-space:pre-wrap'>{full_text}</div>",
                     unsafe_allow_html=True,
@@ -191,6 +216,4 @@ elif ask and not question.strip():
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption(
-    "Built with sentence-transformers · FAISS · OpenAI · Streamlit"
-)
+st.caption("Built with sentence-transformers · FAISS · OpenAI · Streamlit")
