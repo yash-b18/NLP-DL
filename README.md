@@ -42,13 +42,15 @@ Three retrieval strategies are implemented, all sharing the same GPT-4o-mini gen
 | **Classical ML** | `tfidf` | TF-IDF bag-of-words + cosine similarity |
 | **Deep learning** | `dense` | sentence-transformer dense embeddings + FAISS |
 
-**k=3 comparison (Catan):**
+**k=3 comparison across both games (full evaluation):**
 
-| Retriever | Precision@3 | Coverage |
-|---|---|---|
-| Random (baseline) | 21.9% | 13.0% |
-| TF-IDF (classical ML) | 96.9% | 81.8% |
-| Dense (deep learning) | 100.0% | 87.5% |
+| Retriever | Catan P@3 | Catan Correctness | Monopoly P@3 | Monopoly Correctness |
+|---|---|---|---|---|
+| Random (baseline) | 25% | 23% | 12% | 28% |
+| TF-IDF (classical ML) | 97% | 72% | 91% | 88% |
+| Dense (deep learning) | 100% | 86% | 94% | 95% |
+
+**Hallucination Rate (all retrievers, both games):** 0%
 
 ---
 
@@ -75,7 +77,11 @@ Three retrieval strategies are implemented, all sharing the same GPT-4o-mini gen
 │   │   └── monopoly_eval.json       # 20 correctness Qs + 12 stress-test Qs (Monopoly)
 │   └── outputs/
 │       ├── catan_results.csv                      # Catan dense eval results (scored)
+│       ├── catan_tfidf_results.csv                # Catan TF-IDF eval results (scored)
+│       ├── catan_random_results.csv               # Catan random eval results (scored)
 │       ├── monopoly_results.csv                   # Monopoly dense eval results (scored)
+│       ├── monopoly_tfidf_results.csv             # Monopoly TF-IDF eval results (scored)
+│       ├── monopoly_random_results.csv            # Monopoly random eval results (scored)
 │       └── catan_experiment_k_sensitivity.csv     # k-sensitivity experiment results
 │
 ├── models/
@@ -198,27 +204,27 @@ Adversarial questions in three sub-categories:
 
 ## Results
 
-### Catan (Dense retriever)
+### Catan
 
-| Category                 | N      | Retrieval P@3 | Avg Correctness |
-| ------------------------ | ------ | ------------- | --------------- |
-| Correctness questions    | 20     | 100%          | 88%             |
-| Stress A — multi-section | 3      | 100%          | 50%             |
-| Stress B — edge cases    | 5      | 100%          | 90%             |
-| Stress C — unanswerable  | 4      | 100%          | 88%             |
-| **Overall**              | **32** | **100%**      | **83%**         |
+| Category                 | N      | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+| ------------------------ | ------ | --------- | ------------- | ---------- | -------------- | ---------- | -------------- |
+| Correctness questions    | 20     | 100%      | 88%           | 95%        | 85%            | 20%        | 18%            |
+| Stress A — multi-section | 3      | 100%      | 67%           | 100%       | 0%             | 33%        | 50%            |
+| Stress B — edge cases    | 5      | 100%      | 100%          | 100%       | 70%            | 0%         | 0%             |
+| Stress C — unanswerable  | 4      | 100%      | 75%           | 100%       | 62%            | 75%        | 62%            |
+| **Overall**              | **32** | **100%**  | **86%**       | **97%**    | **72%**        | **25%**    | **23%**        |
 
-### Monopoly (Dense retriever)
+### Monopoly
 
-| Category                 | N      | Retrieval P@3 | Avg Correctness |
-| ------------------------ | ------ | ------------- | --------------- |
-| Correctness questions    | 20     | 100%          | 93%             |
-| Stress A — multi-section | 3      | 100%          | 100%            |
-| Stress B — edge cases    | 5      | 100%          | 100%            |
-| Stress C — unanswerable  | 5      | 100%          | 100%            |
-| **Overall**              | **32** | **100%**      | **97%**         |
+| Category                 | N      | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+| ------------------------ | ------ | --------- | ------------- | ---------- | -------------- | ---------- | -------------- |
+| Correctness questions    | 20     | 95%       | 92%           | 90%        | 85%            | 15%        | 15%            |
+| Stress A — multi-section | 3      | 100%      | 100%          | 100%       | 100%           | 33%        | 33%            |
+| Stress B — edge cases    | 4      | 100%      | 100%          | 100%       | 75%            | 0%         | 0%             |
+| Stress C — unanswerable  | 5      | 80%       | 100%          | 80%        | 100%           | 0%         | 100%           |
+| **Overall**              | **32** | **94%**   | **95%**       | **91%**    | **88%**        | **12%**    | **28%**        |
 
-**Hallucination Rate (both games):** 0%
+**Hallucination Rate (all retrievers, both games):** 0%
 
 ---
 
@@ -239,9 +245,11 @@ Adding a new game requires: a rulebook `.txt` file, a chunker function registere
 
 ## Key Findings
 
-- **Dense retrieval dominates** at k=3: 100% Precision@3 vs 96.9% for TF-IDF and 21.9% for random
-- **TF-IDF is competitive** — at k=7 it matches dense at 100%, showing classical ML is viable with slightly more retrieved chunks
-- **Failures are generation problems, not retrieval problems** — the model occasionally abstains even when the answer is in the retrieved context
-- **Hallucination resistance is strong** across both games and all retrievers — the grounding prompt prevents invention of rules
+- **Dense retrieval dominates** on both games: 100%/94% Precision@3 vs 97%/91% for TF-IDF and 25%/12% for random
+- **TF-IDF is competitive on correctness** — 85% correctness on Catan vs 88% on Monopoly, degrading mainly on multi-section stress questions where semantic retrieval is critical
+- **Random baseline collapses on edge-case questions** — 0% P@3 on Stress B for both games; it only succeeds on unanswerable (C) questions where abstention is always correct
+- **Failures are generation problems, not retrieval problems** — TF-IDF achieved 97% P@3 on Catan but only 72% correctness; the gap is from correct chunks being retrieved but answers still failing
+- **Hallucination resistance is strong** across all 6 game/retriever combinations — the grounding prompt prevents rule invention regardless of retrieval quality
+- **Monopoly is easier than Catan** — dense correctness 95% vs 86%; Monopoly's rulebook is more linear with fewer cross-references to physical components
 
 Full error analysis in [`notebooks/analysis.md`](notebooks/analysis.md).

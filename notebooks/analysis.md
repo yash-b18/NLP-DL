@@ -20,27 +20,27 @@ Each game was evaluated on 20 correctness questions and 12 adversarial stress-te
 
 ## Quantitative Results
 
-### Catan (Dense retriever, k=3)
+### Catan — all three retrievers (k=3)
 
-| Category | N | Retrieval P@3 | Avg Correctness |
-|---|---|---|---|
-| Correctness questions | 20 | 100% | 88% |
-| Stress A — multi-section | 3 | 100% | 50% |
-| Stress B — edge cases | 5 | 100% | 90% |
-| Stress C — unanswerable | 4 | 100% | 88% |
-| **Overall** | **32** | **100%** | **83%** |
+| Category | N | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+|---|---|---|---|---|---|---|---|
+| Correctness questions | 20 | 100% | 88% | 95% | 85% | 20% | 18% |
+| Stress A — multi-section | 3 | 100% | 67% | 100% | 0% | 33% | 50% |
+| Stress B — edge cases | 5 | 100% | 100% | 100% | 70% | 0% | 0% |
+| Stress C — unanswerable | 4 | 100% | 75% | 100% | 62% | 75% | 62% |
+| **Overall** | **32** | **100%** | **86%** | **97%** | **72%** | **25%** | **23%** |
 
-### Monopoly (Dense retriever, k=3)
+### Monopoly — all three retrievers (k=3)
 
-| Category | N | Retrieval P@3 | Avg Correctness |
-|---|---|---|---|
-| Correctness questions | 20 | 100% | 93% |
-| Stress A — multi-section | 3 | 100% | 100% |
-| Stress B — edge cases | 5 | 100% | 100% |
-| Stress C — unanswerable | 5 | 100% | 100% |
-| **Overall** | **32** | **100%** | **97%** |
+| Category | N | Dense P@3 | Dense Correct | TF-IDF P@3 | TF-IDF Correct | Random P@3 | Random Correct |
+|---|---|---|---|---|---|---|---|
+| Correctness questions | 20 | 95% | 92% | 90% | 85% | 15% | 15% |
+| Stress A — multi-section | 3 | 100% | 100% | 100% | 100% | 33% | 33% |
+| Stress B — edge cases | 4 | 100% | 100% | 100% | 75% | 0% | 0% |
+| Stress C — unanswerable | 5 | 80% | 100% | 80% | 100% | 0% | 100% |
+| **Overall** | **32** | **94%** | **95%** | **91%** | **88%** | **12%** | **28%** |
 
-**Hallucination Rate (both games):** 0%
+**Hallucination Rate (all retrievers, both games):** 0%
 
 ---
 
@@ -139,14 +139,16 @@ The Monopoly rulebook header — *"MONOPOLY - Official Rules / AGES 8+ | 2 to 8 
 
 ## Key Takeaways
 
-1. **Retrieval precision is not the bottleneck.** Dense retrieval achieves 100% Precision@3 on both games. The retrieval layer is solid for these document sizes.
+1. **Retrieval precision is not the primary bottleneck for dense.** Dense retrieval achieves 100%/94% Precision@3 on Catan/Monopoly. The retrieval layer is solid for these document sizes.
 
-2. **Generation is the harder problem.** The most damaging Catan failures (C04, C16) happened with perfect retrieval — the model refused to use context it was given. Fixing the system prompt raised overall correctness from ~75% to 83%.
+2. **Generation is the harder problem.** TF-IDF achieves 97% P@3 on Catan but only 72% correctness — a 25-point gap explained entirely by generation failures on questions where the right chunk was retrieved but the model still produced wrong or incomplete answers.
 
-3. **TF-IDF is competitive with dense retrieval.** At k=7, TF-IDF matches dense at 100% Precision@k. For applications where embedding inference is slow or expensive, TF-IDF with slightly higher k is a viable alternative.
+3. **TF-IDF degrades sharply on multi-section questions.** On Catan Stress-A (multi-section), TF-IDF correctness is 0% vs 67% for dense. Bag-of-words retrieval retrieves the right chunks individually but the wrong chunks dominate when questions require synthesizing across sections — the query signal is too weak for multi-hop needs.
 
-4. **Hallucination resistance is strong across both games and all retrievers.** The grounding prompt's "only answer from context" instruction is effective. The model correctly abstained on all unanswerable (Category C) questions.
+4. **Random baseline is genuinely useless for answerable questions.** 0% P@3 on Stress-B (edge cases) for both games confirms no retrieval signal = no answer. Its apparent 62% correctness on Catan Stress-C is an artifact — the model correctly abstains on unanswerable questions regardless of what random chunks it receives.
 
-5. **Monopoly outperforms Catan (97% vs 83%).** Monopoly's rulebook is more linear and self-contained — fewer cross-references to physical components, less reliance on multi-section synthesis. This confirms that rulebook structure (not just retrieval quality) is a major factor in RAG performance.
+5. **Hallucination resistance is strong across all 6 combinations.** The grounding prompt's "only answer from context" instruction works even for the random retriever, which frequently receives irrelevant chunks. The model correctly abstains on all Category C (unanswerable) questions for all retrievers and both games.
 
-6. **Evaluation as diagnostic tool.** The dual-metric design — measuring retrieval precision and answer correctness independently — makes it possible to distinguish generation failures from retrieval failures. Without this, C04 and C16 would have appeared to be retrieval problems.
+6. **Monopoly outperforms Catan across all retrievers.** Dense: 95% vs 86%. TF-IDF: 88% vs 72%. Monopoly's rulebook is more linear, self-contained, and free of cross-references to physical components — confirming that document structure is a major factor in RAG correctness independent of retrieval strategy.
+
+7. **Evaluation as diagnostic tool.** The dual-metric design — measuring retrieval precision and answer correctness independently — makes it possible to distinguish retrieval failures from generation failures. Without separate metrics, TF-IDF's 97% P@3 with 72% correctness would be invisible.
