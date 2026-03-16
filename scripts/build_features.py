@@ -217,7 +217,7 @@ def build_tfidf_index(chunks: list[dict], out_dir: Path):
     with open(str(out_dir / "tfidf_vectorizer.pkl"), "wb") as f:
         pickle.dump(vectorizer, f)
 
-    print(f"Saved TF-IDF artifacts → '{out_dir}'")
+    print(f"Saved TF-IDF artifacts -> '{out_dir}'")
     return vectorizer, matrix
 
 
@@ -247,12 +247,12 @@ def main():
 
     with open(chunks_path, "w") as f:
         json.dump(chunks, f, indent=2, ensure_ascii=False)
-    print(f"\nSaved chunks  → '{chunks_path}'")
+    print(f"\nSaved chunks  -> '{chunks_path}'")
 
     import faiss
     index = build_faiss_index(chunks)
     faiss.write_index(index, index_path)
-    print(f"Saved index   → '{index_path}'")
+    print(f"Saved index   -> '{index_path}'")
 
     build_tfidf_index(chunks, out_dir)
 
