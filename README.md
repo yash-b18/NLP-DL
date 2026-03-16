@@ -32,23 +32,31 @@ The core goal is not just a working Q&A bot — it is a **rigorously evaluated**
 ## Project Structure
 
 ```
-├── catan_rulebook.txt       # Official Catan rulebook (source document)
-├── requirements.txt         # Python dependencies
-├── setup.sh                 # Creates .venv and installs all deps
-├── .env                     # API key (OPENAI_API_KEY — not committed)
+├── main.py                        # Streamlit UI — run this to launch the app
+├── requirements.txt               # Python dependencies
+├── setup.sh                       # Creates .venv and installs all deps
+├── .env                           # API key (OPENAI_API_KEY — not committed)
 │
-├── chunk_and_index.py       # Step 1: parse rulebook → 42 chunks → FAISS index
-├── rag_pipeline.py          # Step 2: retrieve top-k + generate with OpenAI
+├── scripts/
+│   ├── build_features.py          # Step 1: parse rulebook → 42 chunks → FAISS index
+│   ├── model.py                   # Step 2: retrieve top-k + generate with OpenAI
+│   ├── evaluate.py                # Runs full evaluation → results.csv + summary stats
+│   └── demo.py                    # Interactive CLI demo (curated questions + free input)
 │
-├── eval_data.json           # 20 correctness Qs + 12 stress-test Qs with gold answers
-├── evaluate.py              # Runs full evaluation → results.csv + summary stats
+├── data/
+│   ├── raw/
+│   │   ├── catan_rulebook.txt     # Official Catan rulebook (source document)
+│   │   └── eval_data.json         # 20 correctness Qs + 12 stress-test Qs with gold answers
+│   ├── processed/
+│   │   └── chunks.json            # Generated: 42 parsed rulebook chunks
+│   └── outputs/
+│       └── results.csv            # Generated: evaluation results with scores and notes
 │
-├── demo.py                  # Interactive class demo (curated questions + free input)
-├── analysis.md              # Written error analysis: failure modes + proposed fixes
+├── models/
+│   └── faiss.index                # Generated: FAISS vector index
 │
-├── chunks.json              # Generated: 42 parsed rulebook chunks
-├── faiss.index              # Generated: FAISS vector index
-└── results.csv              # Generated: evaluation results with scores and notes
+└── notebooks/
+    └── analysis.md                # Written error analysis: failure modes + proposed fixes
 ```
 
 ---
@@ -74,29 +82,35 @@ OPENAI_API_KEY=sk-your-key-here
 ### 3. Build the index (one time)
 
 ```bash
-.venv/bin/python chunk_and_index.py
+.venv/bin/python scripts/build_features.py
 ```
 
-Parses the rulebook into 42 chunks, embeds them, and saves `chunks.json` + `faiss.index`.
+Parses the rulebook into 42 chunks, embeds them, and saves `data/processed/chunks.json` + `models/faiss.index`.
 
 ### 4. Ask a single question
 
 ```bash
-.venv/bin/python rag_pipeline.py "What resources do you need to build a settlement?"
+.venv/bin/python scripts/model.py "What resources do you need to build a settlement?"
 ```
 
 ### 5. Run the full evaluation
 
 ```bash
-.venv/bin/python evaluate.py
+.venv/bin/python scripts/evaluate.py
 ```
 
-Runs all 32 questions, prints metrics, writes `results.csv`.
+Runs all 32 questions, prints metrics, writes `data/outputs/results.csv`.
 
-### 6. Run the interactive demo
+### 6. Launch the UI
 
 ```bash
-.venv/bin/python demo.py
+.venv/bin/streamlit run main.py
+```
+
+### 7. Run the interactive demo
+
+```bash
+.venv/bin/python scripts/demo.py
 ```
 
 Walks through 4 curated questions (including a known failure), then goes interactive.
@@ -160,7 +174,7 @@ Retrieval Precision@3 was 100% — at least one correct chunk was always retriev
 | Multi-hop reasoning     | S01, S06      | Confused synthesis across two chunks                  | Query decomposition                               |
 | Physical card gap       | C09           | Building costs only on physical card, not in text     | Add synthetic "building costs" chunk              |
 
-Full analysis in [`analysis.md`](analysis.md).
+Full analysis in [`notebooks/analysis.md`](notebooks/analysis.md).
 
 ---
 

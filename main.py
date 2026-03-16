@@ -192,6 +192,5 @@ elif ask and not question.strip():
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
 st.caption(
-    "Built with sentence-transformers · FAISS · OpenAI · Streamlit &nbsp;|&nbsp; "
-    "Duke Deep Learning / NLP Hackathon"
+    "Built with sentence-transformers · FAISS · OpenAI · Streamlit"
 )

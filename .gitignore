@@ -6,9 +6,6 @@
 data/processed/chunks.json
 models/faiss.index
 
-# Accidental pip install artifact
-=1.35.0
-
 # Python
 __pycache__/
 *.py[cod]
