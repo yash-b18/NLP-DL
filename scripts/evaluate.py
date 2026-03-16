@@ -4,15 +4,16 @@ scripts/evaluate.py
 Run evaluation sets against the RAG pipeline and produce results.
 
     .venv/bin/python scripts/evaluate.py catan
-    .venv/bin/python scripts/evaluate.py monopoly
+    .venv/bin/python scripts/evaluate.py catan --retriever tfidf
+    .venv/bin/python scripts/evaluate.py monopoly --retriever random
 
 Outputs:
-  data/outputs/{game}_results.csv  — one row per question, ready for manual correctness scoring
+  data/outputs/{game}_results.csv           (dense — default)
+  data/outputs/{game}_tfidf_results.csv     (tfidf)
+  data/outputs/{game}_random_results.csv    (random)
 
-After running, open the CSV and fill in the 'correctness_score' column:
-  1   = fully correct
-  0.5 = partially correct / incomplete
-  0   = wrong or misleading
+After running, fill in the 'correctness_score' column:
+  1 = fully correct,  0.5 = partially correct,  0 = wrong
 """
 
 import csv
@@ -21,7 +22,7 @@ import os
 import sys
 from pathlib import Path
 
-from model import query_rag, DEFAULT_K
+from model import query_rag, DEFAULT_K, DEFAULT_RETRIEVER, RETRIEVERS
 
 K = DEFAULT_K
 
@@ -39,10 +40,7 @@ ABSTAIN_PHRASES = [
 # ---------------------------------------------------------------------------
 
 def check_retrieval(retrieved: list[dict], source_keywords: list[str]) -> dict:
-    """
-    For each expected keyword, check whether any retrieved chunk title
-    contains that keyword (case-insensitive substring match).
-    """
+    """Keyword-based retrieval quality check against chunk titles."""
     retrieved_titles = [c["title"].lower() for c in retrieved]
     hits = sum(
         1 for kw in source_keywords
@@ -50,18 +48,15 @@ def check_retrieval(retrieved: list[dict], source_keywords: list[str]) -> dict:
     )
     coverage = hits / len(source_keywords) if source_keywords else 0.0
     return {
-        "hits":          hits,
-        "expected":      len(source_keywords),
-        "coverage":      round(coverage, 3),
+        "hits":           hits,
+        "expected":       len(source_keywords),
+        "coverage":       round(coverage, 3),
         "precision_at_k": 1.0 if hits > 0 else 0.0,
     }
 
 
 def check_hallucination(answer: str, sub_category: str) -> str:
-    """
-    For Category C (unanswerable) questions, detect whether the model
-    appropriately abstained vs. potentially hallucinated a rule.
-    """
+    """For Category C questions, detect abstention vs. potential hallucination."""
     if sub_category != "C":
         return "N/A"
     abstained = any(p in answer.lower() for p in ABSTAIN_PHRASES)
@@ -72,9 +67,14 @@ def check_hallucination(answer: str, sub_category: str) -> str:
 # Main evaluation loop
 # ---------------------------------------------------------------------------
 
-def run_evaluation(game: str, k: int = K) -> list[dict]:
-    eval_path    = f"data/raw/{game}_eval.json"
-    results_path = f"data/outputs/{game}_results.csv"
+def run_evaluation(game: str, retriever: str = DEFAULT_RETRIEVER, k: int = K) -> list[dict]:
+    eval_path = f"data/raw/{game}_eval.json"
+
+    # Output filename: {game}_results.csv for dense, {game}_{retriever}_results.csv for others
+    if retriever == "dense":
+        results_path = f"data/outputs/{game}_results.csv"
+    else:
+        results_path = f"data/outputs/{game}_{retriever}_results.csv"
 
     if not os.path.exists(eval_path):
         print(f"ERROR: Eval data not found at '{eval_path}'", file=sys.stderr)
@@ -93,7 +93,7 @@ def run_evaluation(game: str, k: int = K) -> list[dict]:
     results = []
     total   = len(all_questions)
 
-    print(f"Running evaluation for '{game}' on {total} questions (k={k})...")
+    print(f"Running evaluation — game='{game}', retriever='{retriever}', k={k}, n={total}")
     print("=" * 70)
 
     for i, q in enumerate(all_questions, 1):
@@ -107,7 +107,7 @@ def run_evaluation(game: str, k: int = K) -> list[dict]:
         print(f"\n[{i}/{total}] {qid} ({category}/{sub_cat or '-'})")
         print(f"  Q: {question[:80]}{'...' if len(question) > 80 else ''}")
 
-        rag_result = query_rag(question, game=game, k=k)
+        rag_result = query_rag(question, game=game, k=k, retriever=retriever)
         answer     = rag_result["answer"]
         retrieved  = rag_result["retrieved"]
 
@@ -122,20 +122,21 @@ def run_evaluation(game: str, k: int = K) -> list[dict]:
             print(f"  Hallucination check: {halluc}")
 
         results.append({
-            "id":                 qid,
-            "category":           category,
-            "sub_category":       sub_cat,
-            "question":           question,
-            "expected_answer":    expected,
-            "model_answer":       answer,
-            "retrieved_chunks":   " | ".join(c["title"] for c in retrieved),
-            "retrieval_hits":     ret["hits"],
-            "retrieval_expected": ret["expected"],
-            "retrieval_coverage": ret["coverage"],
-            "precision_at_k":     ret["precision_at_k"],
+            "id":                  qid,
+            "category":            category,
+            "sub_category":        sub_cat,
+            "retriever":           retriever,
+            "question":            question,
+            "expected_answer":     expected,
+            "model_answer":        answer,
+            "retrieved_chunks":    " | ".join(c["title"] for c in retrieved),
+            "retrieval_hits":      ret["hits"],
+            "retrieval_expected":  ret["expected"],
+            "retrieval_coverage":  ret["coverage"],
+            "precision_at_k":      ret["precision_at_k"],
             "hallucination_check": halluc,
-            "correctness_score":  "",
-            "notes":              "",
+            "correctness_score":   "",
+            "notes":               "",
         })
 
     fieldnames = list(results[0].keys())
@@ -145,7 +146,7 @@ def run_evaluation(game: str, k: int = K) -> list[dict]:
         writer.writerows(results)
 
     print(f"\n\nResults saved to '{results_path}'")
-    _print_summary(results, k)
+    _print_summary(results, k, retriever)
     return results
 
 
@@ -153,7 +154,7 @@ def run_evaluation(game: str, k: int = K) -> list[dict]:
 # Summary statistics
 # ---------------------------------------------------------------------------
 
-def _print_summary(results: list[dict], k: int = K):
+def _print_summary(results: list[dict], k: int = K, retriever: str = DEFAULT_RETRIEVER):
     def group(cat, sub=None):
         return [r for r in results if r["category"] == cat and (sub is None or r["sub_category"] == sub)]
 
@@ -175,7 +176,7 @@ def _print_summary(results: list[dict], k: int = K):
     )
 
     print("\n" + "=" * 60)
-    print(f"EVALUATION SUMMARY  (k={k})")
+    print(f"EVALUATION SUMMARY  (retriever={retriever}, k={k})")
     print("=" * 60)
 
     print(f"\nRetrieval Precision@{k}  (≥1 expected chunk retrieved):")
@@ -208,11 +209,14 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Evaluate RAG pipeline for a board game.")
     parser.add_argument("game", help="Game to evaluate (e.g. catan, monopoly)")
+    parser.add_argument(
+        "--retriever", choices=RETRIEVERS, default=DEFAULT_RETRIEVER,
+        help=f"Retrieval strategy (default: {DEFAULT_RETRIEVER})",
+    )
     args = parser.parse_args()
 
-    game = args.game
-    if not os.path.exists(f"models/{game}/chunks.json") or not os.path.exists(f"models/{game}/faiss.index"):
-        print(f"ERROR: Index not found for '{game}'. Run: .venv/bin/python scripts/build_features.py {game}")
+    if not os.path.exists(f"models/{args.game}/chunks.json"):
+        print(f"ERROR: Index not found for '{args.game}'. Run: .venv/bin/python scripts/build_features.py {args.game}")
         sys.exit(1)
 
-    run_evaluation(game)
+    run_evaluation(args.game, retriever=args.retriever)

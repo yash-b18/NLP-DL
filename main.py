@@ -89,6 +89,18 @@ with st.sidebar:
         key="selected_game",
     )
 
+    RETRIEVER_LABELS = {
+        "dense":  "Dense Embeddings (Deep Learning)",
+        "tfidf":  "TF-IDF (Classical ML)",
+        "random": "Random (Naive Baseline)",
+    }
+    selected_retriever = st.selectbox(
+        "Retrieval strategy",
+        options=["dense", "tfidf", "random"],
+        format_func=lambda r: RETRIEVER_LABELS[r],
+        key="selected_retriever",
+    )
+
     # Clear the question box whenever the game changes
     if st.session_state.get("_last_game") != selected_game:
         st.session_state["question"] = ""
@@ -99,10 +111,9 @@ with st.sidebar:
     st.markdown(
         f"""
         - **Game:** {selected_game.title()}
-        - **Embeddings:** all-MiniLM-L6-v2
-        - **Vector store:** FAISS (cosine)
+        - **Retriever:** {RETRIEVER_LABELS[selected_retriever]}
         - **LLM:** gpt-4o-mini
-        - **Retrieval k:** 3
+        - **k:** 3
         """
     )
 
@@ -174,7 +185,7 @@ if ask and question.strip():
     retrieve_fn, generate_fn = load_pipeline(selected_game)
 
     with st.spinner("Retrieving relevant rules…"):
-        retrieved = retrieve_fn(question, game=selected_game, k=3)
+        retrieved = retrieve_fn(question, game=selected_game, k=3, retriever=selected_retriever)
 
     with st.spinner("Generating answer…"):
         answer = generate_fn(question, retrieved, game=selected_game)

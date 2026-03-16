@@ -165,7 +165,7 @@ GAMES: dict[str, callable] = {
 
 
 # ---------------------------------------------------------------------------
-# Embedding + FAISS index
+# Embedding + FAISS index  (deep learning retriever)
 # ---------------------------------------------------------------------------
 
 def build_faiss_index(chunks: list[dict]):
@@ -190,6 +190,35 @@ def build_faiss_index(chunks: list[dict]):
     index.add(embeddings)
     print(f"FAISS index: {index.ntotal} vectors, dim={dim}")
     return index
+
+
+# ---------------------------------------------------------------------------
+# TF-IDF index  (classical ML retriever)
+# ---------------------------------------------------------------------------
+
+def build_tfidf_index(chunks: list[dict], out_dir: Path):
+    """Fit a TF-IDF vectorizer on all chunks and save the matrix + vectorizer."""
+    try:
+        import pickle
+        import scipy.sparse
+        from sklearn.feature_extraction.text import TfidfVectorizer
+    except ImportError as e:
+        print(f"Missing dependency: {e}\nRun: .venv/bin/pip install -r requirements.txt")
+        sys.exit(1)
+
+    texts = [c["text"] for c in chunks]
+    print(f"Building TF-IDF index over {len(texts)} chunks...")
+
+    vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+    matrix = vectorizer.fit_transform(texts)
+    print(f"TF-IDF matrix: {matrix.shape[0]} docs × {matrix.shape[1]} terms")
+
+    scipy.sparse.save_npz(str(out_dir / "tfidf_matrix.npz"), matrix)
+    with open(str(out_dir / "tfidf_vectorizer.pkl"), "wb") as f:
+        pickle.dump(vectorizer, f)
+
+    print(f"Saved TF-IDF artifacts → '{out_dir}'")
+    return vectorizer, matrix
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +253,8 @@ def main():
     index = build_faiss_index(chunks)
     faiss.write_index(index, index_path)
     print(f"Saved index   → '{index_path}'")
+
+    build_tfidf_index(chunks, out_dir)
 
     print(f"\nDone. You can now run: .venv/bin/python scripts/model.py {game} 'your question'")
 

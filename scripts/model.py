@@ -1,12 +1,16 @@
 """
 scripts/model.py
 ----------------
-Retrieval-Augmented Generation pipeline for board game rules questions.
+Retrieval-Augmented Generation pipeline supporting three retrieval strategies:
+
+  dense  — sentence-transformers embeddings + FAISS  (deep learning)
+  tfidf  — TF-IDF bag-of-words + cosine similarity   (classical ML)
+  random — random chunk selection                     (naive baseline)
 
 Usage (from project root):
     .venv/bin/python scripts/model.py catan 'What resources do you need to build a settlement?'
-    .venv/bin/python scripts/model.py monopoly 'How much money does each player start with?'
-    .venv/bin/python scripts/model.py catan   # uses a default demo question
+    .venv/bin/python scripts/model.py monopoly 'How much money does each player start with?' --retriever tfidf
+    .venv/bin/python scripts/model.py catan --retriever random
 
 Requires scripts/build_features.py to have been run first for the given game.
 Requires OPENAI_API_KEY to be set in the environment.
@@ -22,14 +26,16 @@ try:
 except ImportError:
     pass
 
-DEFAULT_K    = 3
-OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_K         = 3
+DEFAULT_RETRIEVER = "dense"
+RETRIEVERS        = ["dense", "tfidf", "random"]
+OPENAI_MODEL      = "gpt-4o-mini"
 
 # ---------------------------------------------------------------------------
 # Per-game singleton registry
 # ---------------------------------------------------------------------------
 
-_registry: dict[str, dict] = {}   # game -> {model, index, chunks, client, system_prompt}
+_registry: dict[str, dict] = {}   # game -> loaded artifacts
 
 
 def _make_system_prompt(game: str) -> str:
@@ -50,7 +56,7 @@ def _make_system_prompt(game: str) -> str:
 
 
 def _load(game: str):
-    """Lazy-load and cache the model, index, and chunks for the given game."""
+    """Lazy-load and cache all retrieval artifacts for the given game."""
     if game in _registry:
         return
 
@@ -78,7 +84,7 @@ def _load(game: str):
         sys.exit(1)
 
     print(f"Loading embedding model (all-MiniLM-L6-v2)...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    dense_model = SentenceTransformer("all-MiniLM-L6-v2")
 
     print(f"Loading FAISS index for '{game}'...")
     index = faiss.read_index(index_path)
@@ -86,29 +92,40 @@ def _load(game: str):
     with open(chunks_path) as f:
         chunks = json.load(f)
 
-    _registry[game] = {
-        "model":         model,
+    entry: dict = {
+        "dense_model":   dense_model,
         "index":         index,
         "chunks":        chunks,
         "client":        OpenAI(),
         "system_prompt": _make_system_prompt(game),
     }
+
+    # TF-IDF artifacts (classical ML) — optional, built by build_features.py
+    tfidf_matrix_path     = f"models/{game}/tfidf_matrix.npz"
+    tfidf_vectorizer_path = f"models/{game}/tfidf_vectorizer.pkl"
+    if os.path.exists(tfidf_matrix_path) and os.path.exists(tfidf_vectorizer_path):
+        import pickle
+        import scipy.sparse
+        entry["tfidf_matrix"]     = scipy.sparse.load_npz(tfidf_matrix_path)
+        with open(tfidf_vectorizer_path, "rb") as f:
+            entry["tfidf_vectorizer"] = pickle.load(f)
+        print(f"Loaded TF-IDF index for '{game}'.")
+
+    _registry[game] = entry
     print(f"Ready — {len(chunks)} chunks loaded for '{game}'.\n")
 
 
 # ---------------------------------------------------------------------------
-# Retrieval
+# Retrieval — three strategies
 # ---------------------------------------------------------------------------
 
-def retrieve(query: str, game: str, k: int = DEFAULT_K) -> list[dict]:
-    """Return the top-k most relevant chunks for the query from the given game's index."""
+def _dense_retrieve(query: str, game: str, k: int) -> list[dict]:
+    """Deep learning: sentence-transformer embeddings + FAISS cosine search."""
     import faiss
-    _load(game)
     reg = _registry[game]
 
-    query_emb = reg["model"].encode([query], convert_to_numpy=True)
+    query_emb = reg["dense_model"].encode([query], convert_to_numpy=True)
     faiss.normalize_L2(query_emb)
-
     scores, indices = reg["index"].search(query_emb, k)
 
     results = []
@@ -121,19 +138,74 @@ def retrieve(query: str, game: str, k: int = DEFAULT_K) -> list[dict]:
     return results
 
 
+def _tfidf_retrieve(query: str, game: str, k: int) -> list[dict]:
+    """Classical ML: TF-IDF bag-of-words + cosine similarity."""
+    from sklearn.metrics.pairwise import cosine_similarity
+    reg = _registry[game]
+
+    if "tfidf_vectorizer" not in reg:
+        print(
+            f"TF-IDF index not found for '{game}'. "
+            f"Re-run: .venv/bin/python scripts/build_features.py {game}",
+            file=sys.stderr,
+        )
+        return []
+
+    query_vec = reg["tfidf_vectorizer"].transform([query])
+    scores    = cosine_similarity(query_vec, reg["tfidf_matrix"])[0]
+    top_idx   = scores.argsort()[::-1][:k]
+
+    results = []
+    for idx in top_idx:
+        chunk = reg["chunks"][idx].copy()
+        chunk["retrieval_score"] = float(scores[idx])
+        chunk["chunk_idx"]       = int(idx)
+        results.append(chunk)
+    return results
+
+
+def _random_retrieve(query: str, game: str, k: int) -> list[dict]:
+    """Naive baseline: randomly select k chunks (no query signal)."""
+    import random
+    reg     = _registry[game]
+    chunks  = reg["chunks"]
+    indices = random.sample(range(len(chunks)), min(k, len(chunks)))
+
+    results = []
+    for idx in indices:
+        chunk = chunks[idx].copy()
+        chunk["retrieval_score"] = 0.0
+        chunk["chunk_idx"]       = int(idx)
+        results.append(chunk)
+    return results
+
+
+def retrieve(
+    query:     str,
+    game:      str,
+    k:         int = DEFAULT_K,
+    retriever: str = DEFAULT_RETRIEVER,
+) -> list[dict]:
+    """Return the top-k most relevant chunks using the specified retrieval strategy."""
+    _load(game)
+    if retriever == "tfidf":
+        return _tfidf_retrieve(query, game, k)
+    elif retriever == "random":
+        return _random_retrieve(query, game, k)
+    else:
+        return _dense_retrieve(query, game, k)
+
+
 # ---------------------------------------------------------------------------
-# Generation
+# Generation (shared across all retrievers)
 # ---------------------------------------------------------------------------
 
 def generate(query: str, context_chunks: list[dict], game: str) -> str:
-    """Call OpenAI with the retrieved context and return a grounded answer."""
+    """Call OpenAI with retrieved context and return a grounded answer."""
     _load(game)
     reg = _registry[game]
 
-    context_str = "\n\n---\n\n".join(
-        f"[{c['title']}]\n{c['text']}"
-        for c in context_chunks
-    )
+    context_str  = "\n\n---\n\n".join(f"[{c['title']}]\n{c['text']}" for c in context_chunks)
     user_message = f"Rulebook context:\n\n{context_str}\n\n---\n\nQuestion: {query}"
 
     response = reg["client"].chat.completions.create(
@@ -152,18 +224,28 @@ def generate(query: str, context_chunks: list[dict], game: str) -> str:
 # Full pipeline
 # ---------------------------------------------------------------------------
 
-def query_rag(question: str, game: str, k: int = DEFAULT_K, verbose: bool = False) -> dict:
+def query_rag(
+    question:  str,
+    game:      str,
+    k:         int = DEFAULT_K,
+    retriever: str = DEFAULT_RETRIEVER,
+    verbose:   bool = False,
+) -> dict:
     """
     Full RAG pipeline: retrieve top-k chunks, then generate a grounded answer.
 
-    Returns a dict with keys: question, answer, retrieved (list of {title, score, chunk_idx})
+    retriever options:
+      "dense"  — sentence-transformer embeddings + FAISS  (deep learning)
+      "tfidf"  — TF-IDF + cosine similarity               (classical ML)
+      "random" — random chunk selection                    (naive baseline)
     """
-    retrieved = retrieve(question, game, k)
+    retrieved = retrieve(question, game, k, retriever)
     answer    = generate(question, retrieved, game)
 
     result = {
         "question":  question,
         "answer":    answer,
+        "retriever": retriever,
         "retrieved": [
             {"title": c["title"], "score": c["retrieval_score"], "chunk_idx": c["chunk_idx"]}
             for c in retrieved
@@ -171,6 +253,7 @@ def query_rag(question: str, game: str, k: int = DEFAULT_K, verbose: bool = Fals
     }
 
     if verbose:
+        print(f"Retriever: {retriever}")
         print(f"Question: {question}\n")
         print("Retrieved chunks:")
         for c in result["retrieved"]:
@@ -186,15 +269,17 @@ def query_rag(question: str, game: str, k: int = DEFAULT_K, verbose: bool = Fals
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: .venv/bin/python scripts/model.py <game> [question]")
-        print("  game: catan | monopoly")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Query the board game RAG pipeline.")
+    parser.add_argument("game",      help="Game to query (e.g. catan, monopoly)")
+    parser.add_argument("question",  nargs="?", default="", help="Question to ask")
+    parser.add_argument("--retriever", choices=RETRIEVERS, default=DEFAULT_RETRIEVER,
+                        help="Retrieval strategy (default: dense)")
+    args = parser.parse_args()
 
-    game_arg = sys.argv[1]
     _defaults = {
         "catan":    "What resources do you need to build a settlement?",
         "monopoly": "How much money does each player start with?",
     }
-    question = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else _defaults.get(game_arg, "")
-    query_rag(question, game=game_arg, verbose=True)
+    question = args.question or _defaults.get(args.game, "")
+    query_rag(question, game=args.game, retriever=args.retriever, verbose=True)

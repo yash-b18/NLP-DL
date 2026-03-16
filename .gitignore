@@ -5,6 +5,8 @@
 # Generated index files (run scripts/build_features.py <game> to reproduce)
 models/*/chunks.json
 models/*/faiss.index
+models/*/tfidf_matrix.npz
+models/*/tfidf_vectorizer.pkl
 
 # Python
 __pycache__/
