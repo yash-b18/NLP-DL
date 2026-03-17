@@ -604,6 +604,8 @@ if "last_answer" not in st.session_state:
     st.session_state.last_answer = None
 if "last_retrieved" not in st.session_state:
     st.session_state.last_retrieved = None
+if "rerank_enabled" not in st.session_state:
+    st.session_state.rerank_enabled = False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -822,6 +824,18 @@ elif st.session_state.page == "game":
 
         retriever = st.session_state.selected_retriever
 
+        # Reranker toggle (only for non-random retrievers)
+        if retriever != "random":
+            rerank_on = st.toggle(
+                "Cross-Encoder Reranker",
+                value=st.session_state.rerank_enabled,
+                help="Retrieve 10 candidates, then re-rank to top 3 using a cross-encoder model for higher precision.",
+            )
+            if rerank_on != st.session_state.rerank_enabled:
+                st.session_state.rerank_enabled = rerank_on
+        else:
+            st.session_state.rerank_enabled = False
+
         st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
         # Examples
@@ -852,7 +866,7 @@ elif st.session_state.page == "game":
             st.session_state.question = question
             retrieve_fn, generate_fn = load_pipeline(game)
             with st.spinner("Searching rulebook..."):
-                retrieved = retrieve_fn(question, game=game, k=3, retriever=retriever)
+                retrieved = retrieve_fn(question, game=game, k=3, retriever=retriever, rerank=st.session_state.rerank_enabled)
             with st.spinner("Generating answer..."):
                 answer = generate_fn(question, retrieved, game=game)
             st.session_state.last_answer = answer
@@ -884,10 +898,16 @@ elif st.session_state.page == "game":
                 chunks_data = load_chunks(game)
                 for chunk in retrieved:
                     score = chunk["retrieval_score"]
+                    rerank_score = chunk.get("rerank_score")
                     title = chunk["title"]
                     idx = chunk["chunk_idx"]
                     text = chunks_data[idx]["text"] if idx < len(chunks_data) else chunk.get("text", "")
-                    score_str = f"Similarity: {score:.3f}" if score > 0 else "Random selection"
+                    if rerank_score is not None:
+                        score_str = f"Rerank: {rerank_score:.3f} · Retrieval: {score:.3f}"
+                    elif score > 0:
+                        score_str = f"Similarity: {score:.3f}"
+                    else:
+                        score_str = "Random selection"
                     st.markdown(f"""
                     <div class="chunk-card">
                         <div class="chunk-title">{title}</div>

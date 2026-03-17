@@ -27,9 +27,12 @@ except ImportError:
     pass
 
 DEFAULT_K         = 3
+RERANK_CANDIDATES = 10
+RERANK_TOP_N      = 3
 DEFAULT_RETRIEVER = "dense"
 RETRIEVERS        = ["dense", "tfidf", "random"]
 OPENAI_MODEL      = "gpt-4o-mini"
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 # ---------------------------------------------------------------------------
 # Per-game singleton registry
@@ -111,6 +114,12 @@ def _load(game: str):
             entry["tfidf_vectorizer"] = pickle.load(f)
         print(f"Loaded TF-IDF index for '{game}'.")
 
+    # Cross-encoder for reranking (loaded once, shared across games)
+    if "_cross_encoder" not in _registry:
+        from sentence_transformers import CrossEncoder
+        print(f"Loading cross-encoder model ({CROSS_ENCODER_MODEL})...")
+        _registry["_cross_encoder"] = CrossEncoder(CROSS_ENCODER_MODEL)
+
     _registry[game] = entry
     print(f"Ready — {len(chunks)} chunks loaded for '{game}'.\n")
 
@@ -180,20 +189,45 @@ def _random_retrieve(query: str, game: str, k: int) -> list[dict]:
     return results
 
 
+def _rerank(query: str, candidates: list[dict], top_n: int = RERANK_TOP_N) -> list[dict]:
+    """Re-score candidate chunks with a cross-encoder and return the top-n."""
+    cross_encoder = _registry["_cross_encoder"]
+    pairs = [[query, c["text"]] for c in candidates]
+    scores = cross_encoder.predict(pairs)
+
+    for chunk, score in zip(candidates, scores):
+        chunk["rerank_score"] = float(score)
+
+    ranked = sorted(candidates, key=lambda c: c["rerank_score"], reverse=True)
+    return ranked[:top_n]
+
+
 def retrieve(
     query:     str,
     game:      str,
     k:         int = DEFAULT_K,
     retriever: str = DEFAULT_RETRIEVER,
+    rerank:    bool = False,
 ) -> list[dict]:
-    """Return the top-k most relevant chunks using the specified retrieval strategy."""
+    """Return the top-k most relevant chunks using the specified retrieval strategy.
+
+    If rerank=True, first retrieve RERANK_CANDIDATES chunks, then re-score them
+    with a cross-encoder and return the top RERANK_TOP_N.
+    """
     _load(game)
+    fetch_k = RERANK_CANDIDATES if (rerank and retriever != "random") else k
+
     if retriever == "tfidf":
-        return _tfidf_retrieve(query, game, k)
+        results = _tfidf_retrieve(query, game, fetch_k)
     elif retriever == "random":
-        return _random_retrieve(query, game, k)
+        results = _random_retrieve(query, game, k)
     else:
-        return _dense_retrieve(query, game, k)
+        results = _dense_retrieve(query, game, fetch_k)
+
+    if rerank and retriever != "random":
+        results = _rerank(query, results, top_n=RERANK_TOP_N)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -229,6 +263,7 @@ def query_rag(
     game:      str,
     k:         int = DEFAULT_K,
     retriever: str = DEFAULT_RETRIEVER,
+    rerank:    bool = False,
     verbose:   bool = False,
 ) -> dict:
     """
@@ -238,8 +273,11 @@ def query_rag(
       "dense"  — sentence-transformer embeddings + FAISS  (deep learning)
       "tfidf"  — TF-IDF + cosine similarity               (classical ML)
       "random" — random chunk selection                    (naive baseline)
+
+    If rerank=True, retrieves 10 candidates and re-scores with a cross-encoder
+    to select the top 3.
     """
-    retrieved = retrieve(question, game, k, retriever)
+    retrieved = retrieve(question, game, k, retriever, rerank=rerank)
     answer    = generate(question, retrieved, game)
 
     result = {
@@ -275,6 +313,8 @@ if __name__ == "__main__":
     parser.add_argument("question",  nargs="?", default="", help="Question to ask")
     parser.add_argument("--retriever", choices=RETRIEVERS, default=DEFAULT_RETRIEVER,
                         help="Retrieval strategy (default: dense)")
+    parser.add_argument("--rerank", action="store_true",
+                        help="Re-rank candidates with cross-encoder (top 10 → top 3)")
     args = parser.parse_args()
 
     _defaults = {
@@ -282,4 +322,4 @@ if __name__ == "__main__":
         "monopoly": "How much money does each player start with?",
     }
     question = args.question or _defaults.get(args.game, "")
-    query_rag(question, game=args.game, retriever=args.retriever, verbose=True)
+    query_rag(question, game=args.game, retriever=args.retriever, rerank=args.rerank, verbose=True)
